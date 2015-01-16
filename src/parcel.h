@@ -86,7 +86,6 @@ enum {
     PAR_K_I16,
     PAR_K_I32,
     PAR_K_I64,
-    PAR_K_F32,
     PAR_K_F64
 };
 
