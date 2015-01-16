@@ -57,21 +57,22 @@ static inline uint_fast32_t par_swap32( uint_fast32_t val )
 
 /*
     TYPE
-    -----------------
-    0               1
-    0 1 2 3 4 5 6 7 0
-    +---------------+
-    type    |info   |
-    +---------------+
+    ----------------
+    0
+    0 1 2 3 4 5 6 7
+    +--------------+
+    kind       |info
+    +--------------+
 */
 
-// type: 0-15
+// kind(6): 0-63
 enum {
     // 1 byte types
     PAR_K_NIL = 0,
     // flag = 1:true, 0:false
     PAR_K_BOL,
     PAR_K_TBL,
+    PAR_K_NAN,
     PAR_K_I0,
     
     // 8 byte types
@@ -119,6 +120,9 @@ typedef par_type_t par_bol_t;
 
 // EMPTY TABLE
 typedef par_type_t par_tbl_t;
+
+// NAN
+typedef par_type_t par_nan_t;
 
 // ZERO NUMBER
 typedef par_type_t par_type0_t;
@@ -404,6 +408,16 @@ static inline int par_pack_tbllen( parcel_t *p, size_t idx, size_t len )
 }
 
 
+static inline int par_pack_nan( parcel_t *p )
+{
+    par_nan_t *pval = par_pack_slice( p, par_nan_t );
+    
+    pval->data.kind = PAR_K_NAN;
+    
+    return 0;
+}
+
+
 static inline int par_pack_zero( parcel_t *p )
 {
     par_type0_t *pval = par_pack_slice( p, par_type0_t );
@@ -479,7 +493,10 @@ static inline int par_pack_int( parcel_t *p, int_fast64_t num )
 // float
 static inline int par_pack_float( parcel_t *p, double num )
 {
-    if( num == 0.0 ){
+    if( isnan( num ) ){
+        return par_pack_nan( p );
+    }
+    else if( num == 0.0 ){
         return par_pack_zero( p );
     }
     else if( num > 0.0 ){

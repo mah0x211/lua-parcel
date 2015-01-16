@@ -93,8 +93,12 @@ static int pack_val( parcel_t *p, lua_State *L, int idx )
         
         case LUA_TNUMBER:
             num = lua_tonumber( L, idx );
+            // set nan
+            if( isnan( num ) ){
+                return par_pack_nan( p );
+            }
             // set zero
-            if( num == 0.0 ){
+            else if( num == 0.0 ){
                 return par_pack_zero( p );
             }
             // set integer
@@ -219,6 +223,10 @@ static int unpack_val( lua_State *L, parcel_t *p )
         // flag = 1:true, 0:false
         case PAR_K_BOL:
             lua_pushboolean( L, ext.data.flag );
+            return 1;
+        // nan
+        case PAR_K_NAN:
+            lua_pushnumber( L, NAN );
             return 1;
         // zero
         case PAR_K_I0:
