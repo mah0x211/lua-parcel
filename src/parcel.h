@@ -61,7 +61,7 @@ static inline uint_fast32_t par_swap32( uint_fast32_t val )
     0               1
     0 1 2 3 4 5 6 7 0
     +---------------+
-    type    |attr   |
+    type    |info   |
     +---------------+
 */
 
@@ -69,7 +69,7 @@ static inline uint_fast32_t par_swap32( uint_fast32_t val )
 enum {
     // 1 byte types
     PAR_K_NIL = 0,
-    // attr = 1:true, 0:false
+    // flag = 1:true, 0:false
     PAR_K_BOL,
     PAR_K_TBL,
     PAR_K_I0,
@@ -80,8 +80,8 @@ enum {
     PAR_K_MAP,
     
     // 2-9 byte
-    // attr = 1:sign, 0:unsign
     // endian = 1:big-endian, 0:littel-endian
+    // flag = 1:sign, 0:unsign
     PAR_K_I8,
     PAR_K_I16,
     PAR_K_I32,
@@ -89,16 +89,18 @@ enum {
     PAR_K_F64
 };
 
+// endianness
+#define PAR_A_LITEND    0x0
+#define PAR_A_BIGEND    0x1
 
+// signedness
 #define PAR_A_UNSIGN    0x0
-#define PAR_A_SIGN      0x2
-#define PAR_A_EBIG      0x1
-#define PAR_A_ELIT      0x0
+#define PAR_A_SIGNED    0x1
 
 #define PAR_INFO_FIELDS \
-    uint_fast8_t kind:4; \
-    uint_fast8_t attr:3; \
-    uint_fast8_t endian:1
+    uint_fast8_t endian:1; \
+    uint_fast8_t flag:1; \
+    uint_fast8_t kind:6
 
 
 typedef union {
@@ -315,7 +317,7 @@ static inline int par_pack_bool( parcel_t *p, int val )
     par_bol_t *pval = par_pack_slice( p, par_bol_t );
     
     pval->data.kind = PAR_K_BOL;
-    pval->data.attr = !!val;
+    pval->data.flag = !!val;
     
     return 0;
 }
@@ -416,10 +418,10 @@ static inline int par_pack_zero( parcel_t *p )
 }
 
 
-#define par_pack_bitint(p,bit,v,a) do { \
+#define par_pack_bitint(p,bit,v,f) do { \
     par_type ## bit ## _t *pval = par_pack_slice( p, par_type ## bit ## _t ); \
     pval->data.kind = PAR_K_I##bit; \
-    pval->data.attr = (uint_fast8_t)a; \
+    pval->data.flag = (uint_fast8_t)f; \
     *((uint_fast ## bit ## _t*)pval->data.val) = (uint_fast ## bit ## _t)v; \
 }while(0)
 
@@ -454,16 +456,16 @@ static inline int par_pack_int( parcel_t *p, int_fast64_t num )
         return par_pack_zero( p );
     }
     else if( num >= INT8_MIN ){
-        par_pack_bitint( p, 8, num, PAR_A_SIGN );
+        par_pack_bitint( p, 8, num, PAR_A_SIGNED );
     }
     else if( num >= INT16_MIN ){
-        par_pack_bitint( p, 16, num, PAR_A_SIGN );
+        par_pack_bitint( p, 16, num, PAR_A_SIGNED );
     }
     else if( num >= INT32_MIN ){
-        par_pack_bitint( p, 32, num, PAR_A_SIGN );
+        par_pack_bitint( p, 32, num, PAR_A_SIGNED );
     }
     else {
-        par_pack_bitint( p, 64, num, PAR_A_SIGN );
+        par_pack_bitint( p, 64, num, PAR_A_SIGNED );
     }
     
     return 0;
@@ -476,8 +478,8 @@ static inline int par_pack_int( parcel_t *p, int_fast64_t num )
 #define par_unpack_bitint(cur,t,bit,ext) do { \
     par_type ## bit ## _t *pval = (par_type ## bit ## _t*)t; \
     ext->data.endian = pval->data.endian; \
-    ext->data.attr = pval->data.attr; \
-    if( ext->data.attr ){ \
+    ext->data.flag = pval->data.flag; \
+    if( ext->data.flag ){ \
         ext->data.val.i##bit = *(int_fast ## bit ## _t*)pval->data.val; \
     } \
     else { \
@@ -500,9 +502,9 @@ static inline int par_unpack( parcel_t *p, par_extract_t *ext )
         if( type->data.kind <= PAR_K_I0 )
         {
             // set boolean value
-            // attr = 1:true, 0:false
+            // flag = 1:true, 0:false
             if( type->data.kind == PAR_K_BOL ){
-                ext->data.attr = type->data.attr;
+                ext->data.flag = type->data.flag;
             }
             p->cur += sizeof( par_type_t );
         }
@@ -522,8 +524,8 @@ static inline int par_unpack( parcel_t *p, par_extract_t *ext )
             p->cur += sizeof( par_typex_t );
         }
         // number
-        // attr = 1x:sign, 0x:unsign
-        // endian = x1:big-endian, x0:littel-endian
+        // endian = 1:big-endian, 0:littel-endian
+        // flag = 1:sign, 0:unsign
         else if( type->data.kind == PAR_K_I8 ){
             par_unpack_bitint( &p->cur, type, 8, ext );
         }

@@ -216,9 +216,9 @@ static int unpack_val( lua_State *L, parcel_t *p )
             lua_pushnil( L );
             return 1;
         // boolean
-        // attr = 1:true, 0:false
+        // flag = 1:true, 0:false
         case PAR_K_BOL:
-            lua_pushboolean( L, ext.data.attr );
+            lua_pushboolean( L, ext.data.flag );
             return 1;
         // zero
         case PAR_K_I0:
@@ -237,10 +237,10 @@ static int unpack_val( lua_State *L, parcel_t *p )
         
         // 2-9 byte pack
         // number
-        // attr = 1:sign, 0:unsign
         // endian = 1:big-endian, 0:littel-endian
+        // flag = 1:sign, 0:unsign
         #define lstate_push_extint( L, ext, bit ) do { \
-            if( ext.data.attr ){ \
+            if( ext.data.flag ){ \
                 lua_pushinteger( L, (lua_Integer)ext.data.val.i##bit ); \
             } \
             else { \
