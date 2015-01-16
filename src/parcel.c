@@ -50,9 +50,9 @@ static int pack_tbl( parcel_t *b, lua_State *L, int idx, int ktype,
     // key: -2, val: -1
     do
     {
-        // invalid key
+        // unsupported key
         if( lua_type( L, -2 ) != ktype ){
-            errno = EINVAL;
+            errno = ENOTSUP;
             return -1;
         }
         // append key-val pair
@@ -148,9 +148,9 @@ static int pack_val( parcel_t *p, lua_State *L, int idx )
             }
         break;
         
-        // invalid key
+        // unsupported key
         default:
-            errno = EINVAL;
+            errno = ENOTSUP;
             return -1;
     }
     
