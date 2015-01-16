@@ -407,6 +407,16 @@ static inline int par_pack_tbllen( parcel_t *p, size_t idx, size_t len )
 }
 
 
+static inline int par_pack_zero( parcel_t *p )
+{
+    par_type0_t *pval = par_pack_slice( p, par_type0_t );
+    
+    pval->data.kind = PAR_K_I0;
+    
+    return 0;
+}
+
+
 #define par_pack_bitint(p,bit,v,a) do { \
     par_type ## bit ## _t *pval = par_pack_slice( p, par_type ## bit ## _t ); \
     pval->data.kind = PAR_K_I##bit; \
@@ -418,7 +428,10 @@ static inline int par_pack_tbllen( parcel_t *p, size_t idx, size_t len )
 // positive integer
 static inline int par_pack_uint( parcel_t *p, uint_fast64_t num )
 {
-    if( num <= UINT8_MAX ){
+    if( num == 0 ){
+        return par_pack_zero( p );
+    }
+    else if( num <= UINT8_MAX ){
         par_pack_bitint( p, 8, num, PAR_A_UNSIGN );
     }
     else if( num <= UINT16_MAX ){
@@ -438,7 +451,10 @@ static inline int par_pack_uint( parcel_t *p, uint_fast64_t num )
 // negative integer
 static inline int par_pack_int( parcel_t *p, int_fast64_t num )
 {
-    if( num >= INT8_MIN ){
+    if( num == 0 ){
+        return par_pack_zero( p );
+    }
+    else if( num >= INT8_MIN ){
         par_pack_bitint( p, 8, num, PAR_A_SIGN );
     }
     else if( num >= INT16_MIN ){
@@ -450,16 +466,6 @@ static inline int par_pack_int( parcel_t *p, int_fast64_t num )
     else {
         par_pack_bitint( p, 64, num, PAR_A_SIGN );
     }
-    
-    return 0;
-}
-
-
-static inline int par_pack_zero( parcel_t *p )
-{
-    par_type0_t *pval = par_pack_slice( p, par_type0_t );
-    
-    pval->data.kind = PAR_K_I0;
     
     return 0;
 }
