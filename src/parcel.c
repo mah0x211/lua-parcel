@@ -97,6 +97,10 @@ static int pack_val( parcel_t *p, lua_State *L, int idx )
             if( isnan( num ) ){
                 return par_pack_nan( p );
             }
+            // set inf
+            else if( isinf( num ) ){
+                return par_pack_inf( p, num < 0 );
+            }
             // set zero
             else if( num == 0.0 ){
                 return par_pack_zero( p );
@@ -227,6 +231,10 @@ static int unpack_val( lua_State *L, parcel_t *p )
         // nan
         case PAR_K_NAN:
             lua_pushnumber( L, NAN );
+            return 1;
+        // inf
+        case PAR_K_INF:
+            lua_pushnumber( L, ( ext.data.flag ) ? -INFINITY : INFINITY );
             return 1;
         // zero
         case PAR_K_I0:

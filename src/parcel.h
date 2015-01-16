@@ -73,6 +73,8 @@ enum {
     PAR_K_BOL,
     PAR_K_TBL,
     PAR_K_NAN,
+    // flag = 1:sign, 0:false
+    PAR_K_INF,
     PAR_K_I0,
     
     // 8 byte types
@@ -123,6 +125,9 @@ typedef par_type_t par_tbl_t;
 
 // NAN
 typedef par_type_t par_nan_t;
+
+// INF
+typedef par_type_t par_inf_t;
 
 // ZERO NUMBER
 typedef par_type_t par_type0_t;
@@ -418,6 +423,17 @@ static inline int par_pack_nan( parcel_t *p )
 }
 
 
+static inline int par_pack_inf( parcel_t *p, int sign )
+{
+    par_inf_t *pval = par_pack_slice( p, par_inf_t );
+    
+    pval->data.kind = PAR_K_INF;
+    pval->data.flag = !!sign;
+    
+    return 0;
+}
+
+
 static inline int par_pack_zero( parcel_t *p )
 {
     par_type0_t *pval = par_pack_slice( p, par_type0_t );
@@ -493,10 +509,7 @@ static inline int par_pack_int( parcel_t *p, int_fast64_t num )
 // float
 static inline int par_pack_float( parcel_t *p, double num )
 {
-    if( isnan( num ) ){
-        return par_pack_nan( p );
-    }
-    else if( num == 0.0 ){
+    if( num == 0.0 ){
         return par_pack_zero( p );
     }
     else if( num > 0.0 ){
@@ -547,9 +560,8 @@ static inline int par_unpack( parcel_t *p, par_extract_t *ext )
         // 1 byte types
         if( type->data.kind <= PAR_K_I0 )
         {
-            // set boolean value
-            // flag = 1:true, 0:false
-            if( type->data.kind == PAR_K_BOL ){
+            // set flag value
+            if( type->data.kind == PAR_K_BOL || type->data.kind == PAR_K_INF ){
                 ext->data.flag = type->data.flag;
             }
             p->cur += sizeof( par_type_t );
