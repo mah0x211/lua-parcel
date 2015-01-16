@@ -109,7 +109,7 @@ static int pack_val( parcel_t *p, lua_State *L, int idx )
                 return par_pack_int( p, (int_fast64_t)num );
             }
             // set float
-            return 0;
+            return par_pack_float( p, num );
         
         case LUA_TSTRING:
             str = lua_tolstring( L, idx, &len );
@@ -262,6 +262,10 @@ static int unpack_val( lua_State *L, parcel_t *p )
             return 1;
         
         #undef lstate_push_extnum
+        
+        case PAR_K_F64:
+            lua_pushnumber( L, ext.data.val.f64 );
+            return 1;
         
         // array
         case PAR_K_ARR:

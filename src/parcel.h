@@ -181,6 +181,8 @@ typedef union {
 
 
 // to use unpack
+typedef double par_float64_t;
+
 typedef union {
     uint_fast8_t size[16];
     struct {
@@ -196,18 +198,12 @@ typedef union {
             int_fast16_t i16;
             int_fast32_t i32;
             int_fast64_t i64;
+            par_float64_t f64;
         } val;
     } data;
 } par_extract_t;
 
 #undef PAR_INFO_FIELDS
-
-
-// FLOAT 32 BIT
-typedef par_type32_t par_f32_t;
-
-// FLOAT 64 BIT
-typedef par_type64_t par_f64_t;
 
 
 // MARK: parcel memory
@@ -472,6 +468,30 @@ static inline int par_pack_int( parcel_t *p, int_fast64_t num )
 }
 
 
+#define par_pack_bitfloat(p,bit,v,f) do { \
+    par_type ## bit ## _t *pval = par_pack_slice( p, par_type ## bit ## _t ); \
+    pval->data.kind = PAR_K_F##bit; \
+    pval->data.flag = (uint_fast8_t)f; \
+    *((par_float ## bit ## _t*)pval->data.val) = (par_float ## bit ## _t)v; \
+}while(0)
+
+
+// float
+static inline int par_pack_float( parcel_t *p, double num )
+{
+    if( num == 0.0 ){
+        return par_pack_zero( p );
+    }
+    else if( num > 0.0 ){
+        par_pack_bitfloat( p, 64, num, PAR_A_UNSIGN );
+    }
+    else {
+        par_pack_bitfloat( p, 64, num, PAR_A_SIGNED );
+    }
+    
+    return 0;
+}
+
 
 // MARK: unpacking
 
@@ -485,6 +505,15 @@ static inline int par_pack_int( parcel_t *p, int_fast64_t num )
     else { \
         ext->data.val.u##bit = *(uint_fast ## bit ## _t*)pval->data.val; \
     } \
+    *(cur) += sizeof( par_type ## bit ## _t ); \
+}while(0)
+
+
+#define par_unpack_bitfloat(cur,t,bit,ext) do { \
+    par_type ## bit ## _t *pval = (par_type ## bit ## _t*)t; \
+    ext->data.endian = pval->data.endian; \
+    ext->data.flag = pval->data.flag; \
+    ext->data.val.f##bit = *(par_float ## bit ## _t*)pval->data.val; \
     *(cur) += sizeof( par_type ## bit ## _t ); \
 }while(0)
 
@@ -537,6 +566,9 @@ static inline int par_unpack( parcel_t *p, par_extract_t *ext )
         }
         else if( type->data.kind == PAR_K_I64 ){
             par_unpack_bitint( &p->cur, type, 64, ext );
+        }
+        else if( type->data.kind == PAR_K_F64 ){
+            par_unpack_bitfloat( &p->cur, type, 64, ext );
         }
         // unknown data type
         else {
