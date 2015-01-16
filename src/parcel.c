@@ -80,14 +80,6 @@ static int pack_val( parcel_t *p, lua_State *L, int idx )
     
     switch( lua_type( L, idx ) )
     {
-        case LUA_TLIGHTUSERDATA:
-        case LUA_TFUNCTION:
-        case LUA_TUSERDATA:
-        case LUA_TTHREAD:
-        case LUA_TNONE:
-            errno = EINVAL;
-            return -1;
-        
         case LUA_TBOOLEAN:
             return par_pack_bool( p, lua_toboolean( L, idx ) );
         
@@ -125,6 +117,18 @@ static int pack_val( parcel_t *p, lua_State *L, int idx )
         
         case LUA_TNIL:
             return par_pack_nil( p );
+        
+        case LUA_TTABLE:
+            break;
+        
+        //case LUA_TLIGHTUSERDATA:
+        //case LUA_TFUNCTION:
+        //case LUA_TUSERDATA:
+        //case LUA_TTHREAD:
+        //case LUA_TNONE:
+        default:
+            return par_pack_nil( p );
+        
     }
     
     // push space
