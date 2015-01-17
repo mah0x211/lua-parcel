@@ -99,6 +99,7 @@ enum {
     // flag: boolean
     PAR_K_BOL,
     PAR_K_TBL,
+    PAR_K_EOS,  // end-of-stream
     PAR_K_NAN,
     // flag: signedness
     PAR_K_INF,
@@ -107,6 +108,7 @@ enum {
     // 8 byte types
     // flag: lengthiness
     PAR_K_STR,
+    // NOTE: should append PAR_K_EOS packet if flag is PAR_F_VARLEN
     PAR_K_ARR,
     PAR_K_MAP,
     
@@ -230,13 +232,15 @@ typedef union {
 #undef PAR_INFO_FIELDS
 
 
-// MARK: parcel memory
+// MARK: default memory block size
 #define PAR_DEFAULT_BLK_SIZE    1024
 
 
 // MARK: packing
 
 // bin data
+typedef int (*par_packreduce_t)( void *mem, size_t bytes, void *udata );
+
 typedef struct {
     size_t cur;
     size_t blksize;
@@ -244,10 +248,14 @@ typedef struct {
     size_t nblk;
     size_t bytes;
     void *mem;
+    // stream
+    par_packreduce_t reducer;
+    void *udata;
 } parcel_pack_t;
 
 
-static inline int par_pack_init( parcel_pack_t *p, size_t blksize )
+static inline int par_pack_init( parcel_pack_t *p, size_t blksize, 
+                                 par_packreduce_t reducer, void *udata )
 {
     if( !blksize ){
         blksize = PAR_DEFAULT_BLK_SIZE;
@@ -267,6 +275,8 @@ static inline int par_pack_init( parcel_pack_t *p, size_t blksize )
         p->nblkmax = SIZE_MAX / blksize;
         p->nblk = 1;
         p->bytes = blksize;
+        p->reducer = reducer;
+        p->udata = udata;
         return 0;
     }
     
@@ -285,36 +295,55 @@ static inline void par_pack_dispose( parcel_pack_t *p )
 
 static inline int _par_pack_increase( parcel_pack_t *p, size_t bytes )
 {
-    size_t remain = p->bytes - p->cur;
-
-    // remain < bytes
-    if( remain < bytes )
+    if( p->reducer )
     {
-        size_t nblk = 0;
+        size_t remain = p->blksize - p->cur;
         
-        // calculate number of block
-        bytes -= remain;
-        nblk += ( bytes / p->blksize ) + !!( bytes % p->blksize );
-        if( nblk < ( p->nblkmax - p->nblk ) )
+        // remain >= bytes
+        if( remain >= bytes ){
+            return 0;
+        }
+        // reduce memory
+        else if( p->reducer( p->mem, p->cur, p->udata ) == 0 ){
+            // rewind cursor
+            p->cur = 0;
+            return 0;
+        }
+    }
+    else
+    {
+        size_t remain = p->bytes - p->cur;
+        
+        // remain >= bytes
+        if( remain >= bytes ){
+            return 0;
+        }
+        else
         {
-            void *mem = NULL;
+            size_t nblk = 0;
             
-            bytes = p->blksize * ( p->nblk + nblk );
-            if( ( mem = realloc( p->mem, bytes ) ) ){
-                p->mem = mem;
-                p->nblk += nblk;
-                p->bytes = bytes;
-                return 0;
+            // calculate number of block
+            bytes -= remain;
+            nblk += ( bytes / p->blksize ) + !!( bytes % p->blksize );
+            if( nblk < ( p->nblkmax - p->nblk ) )
+            {
+                void *mem = NULL;
+                
+                bytes = p->blksize * ( p->nblk + nblk );
+                if( ( mem = realloc( p->mem, bytes ) ) ){
+                    p->mem = mem;
+                    p->nblk += nblk;
+                    p->bytes = bytes;
+                    return 0;
+                }
+            }
+            else {
+                errno = ENOMEM;
             }
         }
-        else {
-            errno = ENOMEM;
-        }
-        
-        return -1;
     }
     
-    return 0;
+    return -1;
 }
 
 
@@ -354,6 +383,7 @@ static inline int _par_pack_type( parcel_pack_t *p, uint8_t kind, uint8_t flag )
 #define par_pack_bool(p,val)    _par_pack_type(p,PAR_K_BOL,!!val)
 #define par_pack_nil(p)         _par_pack_type(p,PAR_K_NIL,0)
 #define par_pack_tbl(p)         _par_pack_type(p,PAR_K_TBL,0)
+#define par_pack_eos(p)         _par_pack_type(p,PAR_K_EOS,0)
 #define par_pack_nan(p)         _par_pack_type(p,PAR_K_NAN,0)
 #define par_pack_inf(p,sign)    _par_pack_type(p,PAR_K_INF, sign )
 #define par_pack_zero(p)        _par_pack_type(p,PAR_K_I0,0)
@@ -362,15 +392,50 @@ static inline int _par_pack_type( parcel_pack_t *p, uint8_t kind, uint8_t flag )
 static inline int par_pack_str( parcel_pack_t *p, void *val, size_t len )
 {
     par_str_t *pval = _par_pack_slice( p, par_str_t );
-    void *dest = NULL;
     
     pval->data.kind = PAR_K_STR;
     pval->data.flag = PAR_F_FIXLEN;
     pval->data.len = len;
     
+    if( p->reducer )
+    {
+        size_t remain = p->blksize - p->cur;
+        
+        // copy to memory block if have space
+        if( remain >= len ){
+COPY2BLOCK:
+            memcpy( p->mem + p->cur, val, len );
+            p->cur += len;
+            return 0;
+        }
+        
+        // no-space
+        memcpy( p->mem + p->cur, val, remain );
+        p->cur += remain;
+        val += remain;
+        // reduce memory
+        if( p->reducer( p->mem, p->cur, p->udata ) == 0 )
+        {
+            // rewind cursor
+            p->cur = 0;
+            len -= remain;
+            // copy to memory block if have space
+            if( len < p->blksize ){
+                goto COPY2BLOCK;
+            }
+            // reduce 
+            else if( p->reducer( val, len, p->udata ) == 0 ){
+                return 0;
+            }
+        }
+        
+        return -1;
+    }
     // allocate extra bytes space
-    dest = _par_pack_slice_ex( p, len );
-    memcpy( dest, val, len );
+    else {
+        void *dest = _par_pack_slice_ex( p, len );
+        memcpy( dest, val, len );
+    }
     
     return 0;
 }
@@ -378,14 +443,19 @@ static inline int par_pack_str( parcel_pack_t *p, void *val, size_t len )
 
 static inline int _par_pack_typex( parcel_pack_t *p, uint8_t kind, size_t *idx )
 {
-    par_typex_t *pval = NULL;
+    if( !p->reducer )
+    {
+        par_typex_t *pval = NULL;
+        
+        *idx = p->cur;
+        pval = _par_pack_slice( p, par_typex_t );
+        pval->data.kind = kind;
+        pval->data.flag = PAR_F_FIXLEN;
+        
+        return 0;
+    }
     
-    *idx = p->cur;
-    pval = _par_pack_slice( p, par_typex_t );
-    pval->data.kind = kind;
-    pval->data.flag = PAR_F_FIXLEN;
-    
-    return 0;
+    return _par_pack_type( p, kind, PAR_F_VARLEN );
 }
 
 #define par_pack_arr(p,idx)     _par_pack_typex(p,PAR_K_ARR,idx)
@@ -394,28 +464,35 @@ static inline int _par_pack_typex( parcel_pack_t *p, uint8_t kind, size_t *idx )
 
 static inline int par_pack_tbllen( parcel_pack_t *p, size_t idx, size_t len )
 {
-    par_typex_t *pval = NULL;
-    
-    if( ( SIZE_MAX - idx ) < sizeof( par_typex_t ) ||
-        ( idx + sizeof( par_typex_t ) ) > p->cur ){
-        errno = EDOM;
-        return -1;
+    // append eos
+    if( p->reducer ){
+        return par_pack_eos( p );
     }
-    else if( len > PAR_TYPEX_MAXLEN ){
+    else
+    {
+        par_typex_t *pval = NULL;
+        
+        if( ( SIZE_MAX - idx ) < sizeof( par_typex_t ) ||
+            ( idx + sizeof( par_typex_t ) ) > p->cur ){
+            errno = EDOM;
+            return -1;
+        }
+        else if( len > PAR_TYPEX_MAXLEN ){
+            errno = EINVAL;
+            return -1;
+        }
+        
+        pval = (par_typex_t*)(p->mem + idx);
+        switch( pval->data.kind ){
+            case PAR_K_ARR:
+            case PAR_K_MAP:
+                pval->data.len = len;
+                return 0;
+        }
+        
+        // invalid type
         errno = EINVAL;
-        return -1;
     }
-    
-    pval = (par_typex_t*)(p->mem + idx);
-    switch( pval->data.kind ){
-        case PAR_K_ARR:
-        case PAR_K_MAP:
-            pval->data.len = len;
-            return 0;
-    }
-    
-    // invalid type
-    errno = EINVAL;
     
     return -1;
 }
@@ -540,30 +617,37 @@ static inline int par_unpack( parcel_unpack_t *p, par_extract_t *ext )
     {
         type = (par_type_t*)p->mem + p->cur;
         
+        // set kind and flag value
         ext->data.kind = type->data.kind;
+        ext->data.flag = type->data.flag;
+        ext->data.endian = type->data.endian;
         // 1 byte types
-        if( type->data.kind <= PAR_K_I0 )
-        {
-            // set flag value
-            if( type->data.kind == PAR_K_BOL || type->data.kind == PAR_K_INF ){
-                ext->data.flag = type->data.flag;
-            }
+        if( type->data.kind <= PAR_K_I0 ){
             p->cur += sizeof( par_type_t );
         }
         // 8 byte types
-        else if( type->data.kind <= PAR_K_MAP )
+        else if( type->data.kind == PAR_K_STR )
         {
             par_typex_t *typex = (par_typex_t*)type;
             
             ext->data.len = typex->data.len;
             // set string value
             // str = head: mem + par_typex_t, tail: head + len
-            if( type->data.kind == PAR_K_STR ){
-                ext->data.val.str = (char*)p->mem + p->cur + sizeof( par_typex_t );
-                // move cursor
-                p->cur += typex->data.len;
+            ext->data.val.str = (char*)p->mem + p->cur + sizeof( par_typex_t );
+            p->cur += typex->data.len + sizeof( par_typex_t );
+        }
+        else if( type->data.kind <= PAR_K_MAP )
+        {
+            if( type->data.flag == PAR_F_FIXLEN ){
+                par_typex_t *typex = (par_typex_t*)type;
+                
+                ext->data.len = typex->data.len;
+                p->cur += sizeof( par_typex_t );
             }
-            p->cur += sizeof( par_typex_t );
+            else {
+                ext->data.len = 0;
+                p->cur += sizeof( par_type_t );
+            }
         }
         // number
         // endian = 1:big-endian, 0:littel-endian
