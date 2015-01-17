@@ -40,9 +40,9 @@
 }while(0)
 
 
-static int pack_val( parcel_t *b, lua_State *L, int idx );
+static int pack_val( parcel_pack_t *b, lua_State *L, int idx );
 
-static int pack_tbl( parcel_t *b, lua_State *L, int idx, int ktype, 
+static int pack_tbl( parcel_pack_t *b, lua_State *L, int idx, int ktype, 
                      size_t vidx )
 {
     size_t len = 0;
@@ -69,7 +69,7 @@ static int pack_tbl( parcel_t *b, lua_State *L, int idx, int ktype,
 }
 
 
-static int pack_val( parcel_t *p, lua_State *L, int idx )
+static int pack_val( parcel_pack_t *p, lua_State *L, int idx )
 {
     const char *str = NULL;
     double num = 0;
@@ -164,27 +164,43 @@ static int pack_val( parcel_t *p, lua_State *L, int idx )
 
 static int pack_lua( lua_State *L )
 {
-    parcel_t p;
+    const int argc = lua_gettop( L );
     
-    if( par_pack_init( &p ) != 0 ){
+    if( argc > 0 )
+    {
+        lua_Integer bytes = luaL_optinteger( L, 2, 0 );
+        parcel_pack_t p;
+        
+        
+        if( par_pack_init( &p, ( bytes < 0 ) ? 0 : (size_t)bytes ) != 0 ){
+            lua_pushnil( L );
+            lua_pushstring( L, strerror( errno ) );
+            return 2;
+        }
+        else if( argc > 1 ){
+            lua_settop( L, 1 );
+        }
+        // pack
+        if( pack_val( &p, L, 1 ) == 0 ){
+            lua_pop( L, 1 );
+            lua_pushlstring( L, p.mem, p.cur );
+            par_pack_dispose( &p );
+            return 1;
+        }
+        
+        par_pack_dispose( &p );
+        
+        // got error
         lua_pushnil( L );
         lua_pushstring( L, strerror( errno ) );
+        
         return 2;
     }
-    // pack
-    else if( pack_val( &p, L, 1 ) == 0 ){
-        lua_pop( L, 1 );
-        lua_pushlstring( L, p.mem, p.cur );
-        par_pack_dispose( &p );
-        return 1;
-    }
     
-    par_pack_dispose( &p );
-    // got error
+    // no data
     lua_pushnil( L );
-    lua_pushstring( L, strerror( errno ) );
     
-    return 2;
+    return 1;
 }
 
 

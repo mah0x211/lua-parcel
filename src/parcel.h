@@ -216,36 +216,47 @@ typedef union {
 
 
 // MARK: parcel memory
-
-#define ALLOC_UNIT  1024
-#define NALLOC_MAX  SIZE_MAX/ALLOC_UNIT
+#define PAR_DEFAULT_BLK_SIZE    1024
 
 // bin data
 typedef struct {
     size_t cur;
-    size_t nalloc;
-    size_t total;
+    size_t blksize;
+    size_t nblkmax;
+    size_t nblk;
+    size_t bytes;
     void *mem;
-} parcel_t;
+} parcel_pack_t;
 
 
-static inline int par_pack_init( parcel_t *p )
+static inline int par_pack_init( parcel_pack_t *p, size_t blksize )
 {
-    if( ( p->mem = malloc(0) ) ){
+    if( !blksize ){
+        blksize = PAR_DEFAULT_BLK_SIZE;
+    }
+    else
+    {
+        if( blksize < 16 ){
+            blksize = 16;
+        }
+        blksize = blksize / 16 * 16;
+    }
+    
+    if( ( p->mem = malloc( blksize ) ) )
+    {
         p->cur = 0;
-        p->nalloc = 0;
-        p->total = 0;
+        p->blksize = blksize;
+        p->nblkmax = SIZE_MAX / blksize;
+        p->nblk = 1;
+        p->bytes = blksize;
         return 0;
     }
-    else {
-        errno = ENOMEM;
-    }
-
+    
     return -1;
 }
 
 
-static inline void par_pack_dispose( parcel_t *p )
+static inline void par_pack_dispose( parcel_pack_t *p )
 {
     if( p->mem ){
         free( p->mem );
@@ -254,31 +265,27 @@ static inline void par_pack_dispose( parcel_t *p )
 }
 
 
-static inline int par_pack_increase( parcel_t *p, size_t bytes )
+static inline int par_pack_increase( parcel_pack_t *p, size_t bytes )
 {
-    size_t remain = p->total - p->cur;
+    size_t remain = p->bytes - p->cur;
 
     // remain < bytes
     if( remain < bytes )
     {
-        size_t nalloc;
+        size_t nblk = 0;
         
+        // calculate number of block
         bytes -= remain;
-        nalloc = ( bytes / ALLOC_UNIT ) + 
-                 ( bytes % ALLOC_UNIT ? 1 : 0 ) + 
-                 p->nalloc;
-        
-        if( nalloc < NALLOC_MAX )
+        nblk += ( bytes / p->blksize ) + !!( bytes % p->blksize );
+        if( nblk < ( p->nblkmax - p->nblk ) )
         {
-            void *buf;
+            void *mem = NULL;
             
-            bytes = ALLOC_UNIT * nalloc;
-            // overhead: doing memory copy in internally
-            if( ( buf = realloc( p->mem, bytes ) ) ){
-                p->mem = buf;
-                p->nalloc = nalloc;
-                p->total = bytes;
-                //memset( buf + p->cur, 0, bytes - p->cur );
+            bytes = p->blksize * ( p->nblk + nblk );
+            if( ( mem = realloc( p->mem, bytes ) ) ){
+                p->mem = mem;
+                p->nblk += nblk;
+                p->bytes = bytes;
                 return 0;
             }
         }
@@ -295,7 +302,7 @@ static inline int par_pack_increase( parcel_t *p, size_t bytes )
 
 // MARK: packing
 
-static inline void *par_pack_update_cur( parcel_t *p, size_t bytes )
+static inline void *par_pack_update_cur( parcel_pack_t *p, size_t bytes )
 {
     void *mem = p->mem + p->cur;
     
@@ -317,7 +324,7 @@ static inline void *par_pack_update_cur( parcel_t *p, size_t bytes )
 #define par_pack_slice(p,t)  par_pack_slice_ex(p,t,0)
 
 
-static inline int par_pack_bool( parcel_t *p, int val )
+static inline int par_pack_bool( parcel_pack_t *p, int val )
 {
     par_bol_t *pval = par_pack_slice( p, par_bol_t );
     
@@ -328,7 +335,7 @@ static inline int par_pack_bool( parcel_t *p, int val )
 }
 
 
-static inline int par_pack_nil( parcel_t *p )
+static inline int par_pack_nil( parcel_pack_t *p )
 {
     par_nil_t *pval = par_pack_slice( p, par_nil_t );
     
@@ -338,7 +345,7 @@ static inline int par_pack_nil( parcel_t *p )
 }
 
 
-static inline int par_pack_tbl( parcel_t *p )
+static inline int par_pack_tbl( parcel_pack_t *p )
 {
     par_tbl_t *pval = par_pack_slice( p, par_tbl_t );
     
@@ -348,7 +355,7 @@ static inline int par_pack_tbl( parcel_t *p )
 }
 
 
-static inline int par_pack_str( parcel_t *p, const char *val, size_t len )
+static inline int par_pack_str( parcel_pack_t *p, const char *val, size_t len )
 {
     par_str_t *pval = par_pack_slice_ex( p, par_str_t, len );
     
@@ -360,7 +367,7 @@ static inline int par_pack_str( parcel_t *p, const char *val, size_t len )
 }
 
 
-static inline int par_pack_arr( parcel_t *p, size_t *idx )
+static inline int par_pack_arr( parcel_pack_t *p, size_t *idx )
 {
     par_arr_t *pval = NULL;
     
@@ -372,7 +379,7 @@ static inline int par_pack_arr( parcel_t *p, size_t *idx )
 }
 
 
-static inline int par_pack_map( parcel_t *p, size_t *idx )
+static inline int par_pack_map( parcel_pack_t *p, size_t *idx )
 {
     par_map_t *pval = NULL;
     
@@ -384,7 +391,7 @@ static inline int par_pack_map( parcel_t *p, size_t *idx )
 }
 
 
-static inline int par_pack_tbllen( parcel_t *p, size_t idx, size_t len )
+static inline int par_pack_tbllen( parcel_pack_t *p, size_t idx, size_t len )
 {
     par_typex_t *pval = NULL;
     
@@ -413,7 +420,7 @@ static inline int par_pack_tbllen( parcel_t *p, size_t idx, size_t len )
 }
 
 
-static inline int par_pack_nan( parcel_t *p )
+static inline int par_pack_nan( parcel_pack_t *p )
 {
     par_nan_t *pval = par_pack_slice( p, par_nan_t );
     
@@ -423,7 +430,7 @@ static inline int par_pack_nan( parcel_t *p )
 }
 
 
-static inline int par_pack_inf( parcel_t *p, int sign )
+static inline int par_pack_inf( parcel_pack_t *p, int sign )
 {
     par_inf_t *pval = par_pack_slice( p, par_inf_t );
     
@@ -434,7 +441,7 @@ static inline int par_pack_inf( parcel_t *p, int sign )
 }
 
 
-static inline int par_pack_zero( parcel_t *p )
+static inline int par_pack_zero( parcel_pack_t *p )
 {
     par_type0_t *pval = par_pack_slice( p, par_type0_t );
     
@@ -453,7 +460,7 @@ static inline int par_pack_zero( parcel_t *p )
 
 
 // positive integer
-static inline int par_pack_uint( parcel_t *p, uint_fast64_t num )
+static inline int par_pack_uint( parcel_pack_t *p, uint_fast64_t num )
 {
     if( num == 0 ){
         return par_pack_zero( p );
@@ -476,7 +483,7 @@ static inline int par_pack_uint( parcel_t *p, uint_fast64_t num )
 
 
 // negative integer
-static inline int par_pack_int( parcel_t *p, int_fast64_t num )
+static inline int par_pack_int( parcel_pack_t *p, int_fast64_t num )
 {
     if( num == 0 ){
         return par_pack_zero( p );
@@ -507,7 +514,7 @@ static inline int par_pack_int( parcel_t *p, int_fast64_t num )
 
 
 // float
-static inline int par_pack_float( parcel_t *p, double num )
+static inline int par_pack_float( parcel_pack_t *p, double num )
 {
     if( num == 0.0 ){
         return par_pack_zero( p );
