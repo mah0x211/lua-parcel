@@ -524,6 +524,13 @@ static inline int par_pack_float( parcel_t *p, double num )
 
 
 // MARK: unpacking
+// bin data
+typedef struct {
+    size_t cur;
+    size_t blksize;
+    void *mem;
+} parcel_unpack_t;
+
 
 #define par_unpack_bitint(cur,t,bit,ext) do { \
     par_type ## bit ## _t *pval = (par_type ## bit ## _t*)t; \
@@ -548,11 +555,11 @@ static inline int par_pack_float( parcel_t *p, double num )
 }while(0)
 
 
-static inline int par_unpack( parcel_t *p, par_extract_t *ext )
+static inline int par_unpack( parcel_unpack_t *p, par_extract_t *ext )
 {
     par_type_t *type = NULL;
 
-    if( p->cur < p->total )
+    if( p->cur < p->blksize )
     {
         type = (par_type_t*)p->mem + p->cur;
         

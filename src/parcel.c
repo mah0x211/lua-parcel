@@ -189,9 +189,9 @@ static int pack_lua( lua_State *L )
 
 
 
-static int unpack_val( lua_State *L, parcel_t *p );
+static int unpack_val( lua_State *L, parcel_unpack_t *p );
 
-static int unpack_tbl( lua_State *L, parcel_t *p, size_t len )
+static int unpack_tbl( lua_State *L, parcel_unpack_t *p, size_t len )
 {
     // unpack key-value
     while( len-- )
@@ -207,7 +207,7 @@ static int unpack_tbl( lua_State *L, parcel_t *p, size_t len )
 }
 
 
-static int unpack_val( lua_State *L, parcel_t *p )
+static int unpack_val( lua_State *L, parcel_unpack_t *p )
 {
     par_extract_t ext;
     // unpacking
@@ -305,9 +305,9 @@ static int unpack_lua( lua_State *L )
 {
     size_t len = 0;
     const char *mem = (const char*)luaL_checklstring( L, 1, &len );
-    parcel_t p = {
+    parcel_unpack_t p = {
         .cur = 0,
-        .total = len,
+        .blksize = len,
         .mem = (void*)mem,
     };
     
