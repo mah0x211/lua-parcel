@@ -233,6 +233,9 @@ typedef union {
 // MARK: parcel memory
 #define PAR_DEFAULT_BLK_SIZE    1024
 
+
+// MARK: packing
+
 // bin data
 typedef struct {
     size_t cur;
@@ -280,7 +283,7 @@ static inline void par_pack_dispose( parcel_pack_t *p )
 }
 
 
-static inline int par_pack_increase( parcel_pack_t *p, size_t bytes )
+static inline int _par_pack_increase( parcel_pack_t *p, size_t bytes )
 {
     size_t remain = p->bytes - p->cur;
 
@@ -315,9 +318,7 @@ static inline int par_pack_increase( parcel_pack_t *p, size_t bytes )
 }
 
 
-// MARK: packing
-
-static inline void *par_pack_update_cur( parcel_pack_t *p, size_t bytes )
+static inline void *_par_pack_update_cur( parcel_pack_t *p, size_t bytes )
 {
     void *mem = p->mem + p->cur;
     
@@ -326,87 +327,69 @@ static inline void *par_pack_update_cur( parcel_pack_t *p, size_t bytes )
     return mem;
 }
 
+
 // allocate sizeof(t) and extra bytes
-#define par_pack_slice_ex(p,t,ex) ({ \
-    if( par_pack_increase( p, sizeof(t) + ex ) == -1 ){ \
+#define _par_pack_slice_ex(p,l) ({ \
+    if( _par_pack_increase( p, l ) == -1 ){ \
         return -1; \
     } \
-    (t*)par_pack_update_cur( p, sizeof(t) + ex ); \
+    _par_pack_update_cur( p, l ); \
 })
 
 
 // allocate sizeof(t) bytes
-#define par_pack_slice(p,t)  par_pack_slice_ex(p,t,0)
+#define _par_pack_slice(p,t)  (t*)_par_pack_slice_ex(p,sizeof(t))
 
 
-static inline int par_pack_bool( parcel_pack_t *p, int val )
+static inline int _par_pack_type( parcel_pack_t *p, uint8_t kind, uint8_t flag )
 {
-    par_bol_t *pval = par_pack_slice( p, par_bol_t );
+    par_type_t *pval = _par_pack_slice( p, par_type_t );
     
-    pval->data.kind = PAR_K_BOL;
-    pval->data.flag = !!val;
+    pval->data.kind = kind;
+    pval->data.flag = flag;
     
     return 0;
 }
 
+#define par_pack_bool(p,val)    _par_pack_type(p,PAR_K_BOL,!!val)
+#define par_pack_nil(p)         _par_pack_type(p,PAR_K_NIL,0)
+#define par_pack_tbl(p)         _par_pack_type(p,PAR_K_TBL,0)
+#define par_pack_nan(p)         _par_pack_type(p,PAR_K_NAN,0)
+#define par_pack_inf(p,sign)    _par_pack_type(p,PAR_K_INF, sign )
+#define par_pack_zero(p)        _par_pack_type(p,PAR_K_I0,0)
 
-static inline int par_pack_nil( parcel_pack_t *p )
+
+static inline int par_pack_str( parcel_pack_t *p, void *val, size_t len )
 {
-    par_nil_t *pval = par_pack_slice( p, par_nil_t );
-    
-    pval->data.kind = PAR_K_NIL;
-    
-    return 0;
-}
-
-
-static inline int par_pack_tbl( parcel_pack_t *p )
-{
-    par_tbl_t *pval = par_pack_slice( p, par_tbl_t );
-    
-    pval->data.kind = PAR_K_TBL;
-    
-    return 0;
-}
-
-
-static inline int par_pack_str( parcel_pack_t *p, const char *val, size_t len )
-{
-    par_str_t *pval = par_pack_slice_ex( p, par_str_t, len );
+    par_str_t *pval = _par_pack_slice( p, par_str_t );
+    void *dest = NULL;
     
     pval->data.kind = PAR_K_STR;
     pval->data.flag = PAR_F_FIXLEN;
     pval->data.len = len;
-    memcpy( (void*)(pval+1), val, len );
+    
+    // allocate extra bytes space
+    dest = _par_pack_slice_ex( p, len );
+    memcpy( dest, val, len );
     
     return 0;
 }
 
 
-static inline int par_pack_arr( parcel_pack_t *p, size_t *idx )
+static inline int _par_pack_typex( parcel_pack_t *p, uint8_t kind, size_t *idx )
 {
-    par_arr_t *pval = NULL;
+    par_typex_t *pval = NULL;
     
     *idx = p->cur;
-    pval = par_pack_slice( p, par_arr_t );
-    pval->data.kind = PAR_K_ARR;
+    pval = _par_pack_slice( p, par_typex_t );
+    pval->data.kind = kind;
     pval->data.flag = PAR_F_FIXLEN;
     
     return 0;
 }
 
-
-static inline int par_pack_map( parcel_pack_t *p, size_t *idx )
-{
-    par_map_t *pval = NULL;
-    
-    *idx = p->cur;
-    pval = par_pack_slice( p, par_map_t );
-    pval->data.kind = PAR_K_MAP;
-    pval->data.flag = PAR_F_FIXLEN;
-    
-    return 0;
-}
+#define par_pack_arr(p,idx)     _par_pack_typex(p,PAR_K_ARR,idx)
+#define par_pack_map(p,idx)     _par_pack_typex(p,PAR_K_MAP,idx)
 
 
 static inline int par_pack_tbllen( parcel_pack_t *p, size_t idx, size_t len )
@@ -438,39 +421,8 @@ static inline int par_pack_tbllen( parcel_pack_t *p, size_t idx, size_t len )
 }
 
 
-static inline int par_pack_nan( parcel_pack_t *p )
-{
-    par_nan_t *pval = par_pack_slice( p, par_nan_t );
-    
-    pval->data.kind = PAR_K_NAN;
-    
-    return 0;
-}
-
-
-static inline int par_pack_inf( parcel_pack_t *p, int sign )
-{
-    par_inf_t *pval = par_pack_slice( p, par_inf_t );
-    
-    pval->data.kind = PAR_K_INF;
-    pval->data.flag = !!sign;
-    
-    return 0;
-}
-
-
-static inline int par_pack_zero( parcel_pack_t *p )
-{
-    par_type0_t *pval = par_pack_slice( p, par_type0_t );
-    
-    pval->data.kind = PAR_K_I0;
-    
-    return 0;
-}
-
-
-#define par_pack_bitint(p,bit,v,f) do { \
-    par_type ## bit ## _t *pval = par_pack_slice( p, par_type ## bit ## _t ); \
+#define _par_pack_bitint(p,bit,v,f) do { \
+    par_type ## bit ## _t *pval = _par_pack_slice( p, par_type ## bit ## _t ); \
     pval->data.kind = PAR_K_I##bit; \
     pval->data.flag = (uint_fast8_t)f; \
     *((uint_fast ## bit ## _t*)pval->data.val) = (uint_fast ## bit ## _t)v; \
@@ -484,16 +436,16 @@ static inline int par_pack_uint( parcel_pack_t *p, uint_fast64_t num )
         return par_pack_zero( p );
     }
     else if( num <= UINT8_MAX ){
-        par_pack_bitint( p, 8, num, PAR_F_UNSIGN );
+        _par_pack_bitint( p, 8, num, PAR_F_UNSIGN );
     }
     else if( num <= UINT16_MAX ){
-        par_pack_bitint( p, 16, num, PAR_F_UNSIGN );
+        _par_pack_bitint( p, 16, num, PAR_F_UNSIGN );
     }
     else if( num <= UINT32_MAX ){
-        par_pack_bitint( p, 32, num, PAR_F_UNSIGN );
+        _par_pack_bitint( p, 32, num, PAR_F_UNSIGN );
     }
     else {
-        par_pack_bitint( p, 64, num, PAR_F_UNSIGN );
+        _par_pack_bitint( p, 64, num, PAR_F_UNSIGN );
     }
     
     return 0;
@@ -507,24 +459,24 @@ static inline int par_pack_int( parcel_pack_t *p, int_fast64_t num )
         return par_pack_zero( p );
     }
     else if( num >= INT8_MIN ){
-        par_pack_bitint( p, 8, num, PAR_F_SIGNED );
+        _par_pack_bitint( p, 8, num, PAR_F_SIGNED );
     }
     else if( num >= INT16_MIN ){
-        par_pack_bitint( p, 16, num, PAR_F_SIGNED );
+        _par_pack_bitint( p, 16, num, PAR_F_SIGNED );
     }
     else if( num >= INT32_MIN ){
-        par_pack_bitint( p, 32, num, PAR_F_SIGNED );
+        _par_pack_bitint( p, 32, num, PAR_F_SIGNED );
     }
     else {
-        par_pack_bitint( p, 64, num, PAR_F_SIGNED );
+        _par_pack_bitint( p, 64, num, PAR_F_SIGNED );
     }
     
     return 0;
 }
 
 
-#define par_pack_bitfloat(p,bit,v,f) do { \
-    par_type ## bit ## _t *pval = par_pack_slice( p, par_type ## bit ## _t ); \
+#define _par_pack_bitfloat(p,bit,v,f) do { \
+    par_type ## bit ## _t *pval = _par_pack_slice( p, par_type ## bit ## _t ); \
     pval->data.kind = PAR_K_F##bit; \
     pval->data.flag = (uint_fast8_t)f; \
     *((par_float ## bit ## _t*)pval->data.val) = (par_float ## bit ## _t)v; \
@@ -538,10 +490,10 @@ static inline int par_pack_float( parcel_pack_t *p, double num )
         return par_pack_zero( p );
     }
     else if( num > 0.0 ){
-        par_pack_bitfloat( p, 64, num, PAR_F_UNSIGN );
+        _par_pack_bitfloat( p, 64, num, PAR_F_UNSIGN );
     }
     else {
-        par_pack_bitfloat( p, 64, num, PAR_F_SIGNED );
+        _par_pack_bitfloat( p, 64, num, PAR_F_SIGNED );
     }
     
     return 0;
@@ -557,7 +509,7 @@ typedef struct {
 } parcel_unpack_t;
 
 
-#define par_unpack_bitint(cur,t,bit,ext) do { \
+#define _par_unpack_bitint(cur,t,bit,ext) do { \
     par_type ## bit ## _t *pval = (par_type ## bit ## _t*)t; \
     ext->data.endian = pval->data.endian; \
     ext->data.flag = pval->data.flag; \
@@ -571,7 +523,7 @@ typedef struct {
 }while(0)
 
 
-#define par_unpack_bitfloat(cur,t,bit,ext) do { \
+#define _par_unpack_bitfloat(cur,t,bit,ext) do { \
     par_type ## bit ## _t *pval = (par_type ## bit ## _t*)t; \
     ext->data.endian = pval->data.endian; \
     ext->data.flag = pval->data.flag; \
@@ -617,19 +569,19 @@ static inline int par_unpack( parcel_unpack_t *p, par_extract_t *ext )
         // endian = 1:big-endian, 0:littel-endian
         // flag = 1:sign, 0:unsign
         else if( type->data.kind == PAR_K_I8 ){
-            par_unpack_bitint( &p->cur, type, 8, ext );
+            _par_unpack_bitint( &p->cur, type, 8, ext );
         }
         else if( type->data.kind == PAR_K_I16 ){
-            par_unpack_bitint( &p->cur, type, 16, ext );
+            _par_unpack_bitint( &p->cur, type, 16, ext );
         }
         else if( type->data.kind == PAR_K_I32 ){
-            par_unpack_bitint( &p->cur, type, 32, ext );
+            _par_unpack_bitint( &p->cur, type, 32, ext );
         }
         else if( type->data.kind == PAR_K_I64 ){
-            par_unpack_bitint( &p->cur, type, 64, ext );
+            _par_unpack_bitint( &p->cur, type, 64, ext );
         }
         else if( type->data.kind == PAR_K_F64 ){
-            par_unpack_bitfloat( &p->cur, type, 64, ext );
+            _par_unpack_bitfloat( &p->cur, type, 64, ext );
         }
         // unknown data type
         else {
