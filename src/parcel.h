@@ -65,45 +65,60 @@ static inline uint_fast32_t par_swap32( uint_fast32_t val )
     +--------------+
 */
 
+
+#define PAR_INFO_FIELDS \
+    uint_fast8_t endian:1; \
+    uint_fast8_t flag:1; \
+    uint_fast8_t kind:6
+
+// endianness
+#define PAR_E_LIT    0
+#define PAR_E_BIG    0x1
+
+// flag
+// no flag
+#define PAR_F_NONE      0x0
+
+// boolean
+#define PAR_F_FALSE     PAR_F_NONE
+#define PAR_F_TRUE      0x1
+
+// signedness
+#define PAR_F_UNSIGN    PAR_F_NONE
+#define PAR_F_SIGNED    0x1
+
+// lengthiness
+#define PAR_F_FIXLEN    PAR_F_NONE
+#define PAR_F_VARLEN    0x1
+
+
 // kind(6): 0-63
 enum {
     // 1 byte types
     PAR_K_NIL = 0,
-    // flag = 1:true, 0:false
+    // flag: boolean
     PAR_K_BOL,
     PAR_K_TBL,
     PAR_K_NAN,
-    // flag = 1:sign, 0:false
+    // flag: signedness
     PAR_K_INF,
     PAR_K_I0,
     
     // 8 byte types
+    // flag: lengthiness
     PAR_K_STR,
     PAR_K_ARR,
     PAR_K_MAP,
     
     // 2-9 byte
-    // endian = 1:big-endian, 0:littel-endian
-    // flag = 1:sign, 0:unsign
+    // endian: endianness
+    // flag: signedness
     PAR_K_I8,
     PAR_K_I16,
     PAR_K_I32,
     PAR_K_I64,
     PAR_K_F64
 };
-
-// endianness
-#define PAR_A_LITEND    0x0
-#define PAR_A_BIGEND    0x1
-
-// signedness
-#define PAR_A_UNSIGN    0x0
-#define PAR_A_SIGNED    0x1
-
-#define PAR_INFO_FIELDS \
-    uint_fast8_t endian:1; \
-    uint_fast8_t flag:1; \
-    uint_fast8_t kind:6
 
 
 typedef union {
@@ -360,6 +375,7 @@ static inline int par_pack_str( parcel_pack_t *p, const char *val, size_t len )
     par_str_t *pval = par_pack_slice_ex( p, par_str_t, len );
     
     pval->data.kind = PAR_K_STR;
+    pval->data.flag = PAR_F_FIXLEN;
     pval->data.len = len;
     memcpy( (void*)(pval+1), val, len );
     
@@ -374,6 +390,7 @@ static inline int par_pack_arr( parcel_pack_t *p, size_t *idx )
     *idx = p->cur;
     pval = par_pack_slice( p, par_arr_t );
     pval->data.kind = PAR_K_ARR;
+    pval->data.flag = PAR_F_FIXLEN;
     
     return 0;
 }
@@ -386,6 +403,7 @@ static inline int par_pack_map( parcel_pack_t *p, size_t *idx )
     *idx = p->cur;
     pval = par_pack_slice( p, par_map_t );
     pval->data.kind = PAR_K_MAP;
+    pval->data.flag = PAR_F_FIXLEN;
     
     return 0;
 }
@@ -466,16 +484,16 @@ static inline int par_pack_uint( parcel_pack_t *p, uint_fast64_t num )
         return par_pack_zero( p );
     }
     else if( num <= UINT8_MAX ){
-        par_pack_bitint( p, 8, num, PAR_A_UNSIGN );
+        par_pack_bitint( p, 8, num, PAR_F_UNSIGN );
     }
     else if( num <= UINT16_MAX ){
-        par_pack_bitint( p, 16, num, PAR_A_UNSIGN );
+        par_pack_bitint( p, 16, num, PAR_F_UNSIGN );
     }
     else if( num <= UINT32_MAX ){
-        par_pack_bitint( p, 32, num, PAR_A_UNSIGN );
+        par_pack_bitint( p, 32, num, PAR_F_UNSIGN );
     }
     else {
-        par_pack_bitint( p, 64, num, PAR_A_UNSIGN );
+        par_pack_bitint( p, 64, num, PAR_F_UNSIGN );
     }
     
     return 0;
@@ -489,16 +507,16 @@ static inline int par_pack_int( parcel_pack_t *p, int_fast64_t num )
         return par_pack_zero( p );
     }
     else if( num >= INT8_MIN ){
-        par_pack_bitint( p, 8, num, PAR_A_SIGNED );
+        par_pack_bitint( p, 8, num, PAR_F_SIGNED );
     }
     else if( num >= INT16_MIN ){
-        par_pack_bitint( p, 16, num, PAR_A_SIGNED );
+        par_pack_bitint( p, 16, num, PAR_F_SIGNED );
     }
     else if( num >= INT32_MIN ){
-        par_pack_bitint( p, 32, num, PAR_A_SIGNED );
+        par_pack_bitint( p, 32, num, PAR_F_SIGNED );
     }
     else {
-        par_pack_bitint( p, 64, num, PAR_A_SIGNED );
+        par_pack_bitint( p, 64, num, PAR_F_SIGNED );
     }
     
     return 0;
@@ -520,10 +538,10 @@ static inline int par_pack_float( parcel_pack_t *p, double num )
         return par_pack_zero( p );
     }
     else if( num > 0.0 ){
-        par_pack_bitfloat( p, 64, num, PAR_A_UNSIGN );
+        par_pack_bitfloat( p, 64, num, PAR_F_UNSIGN );
     }
     else {
-        par_pack_bitfloat( p, 64, num, PAR_A_SIGNED );
+        par_pack_bitfloat( p, 64, num, PAR_F_SIGNED );
     }
     
     return 0;
