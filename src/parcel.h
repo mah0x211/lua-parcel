@@ -204,10 +204,10 @@ typedef par_typex_t par_type64_t;
 typedef double par_float64_t;
 
 typedef union {
-    uint_fast8_t size[16];
+    uint_fast8_t size[17];
     struct {
         PAR_INFO_FIELDS;
-        uint_fast64_t len:56;
+        uint_fast64_t len;
         union  {
             char *str;
             uint_fast8_t u8;
