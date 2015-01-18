@@ -393,25 +393,25 @@ static inline int par_pack_str( parcel_pack_t *p, void *val, size_t len )
     // 64bit
     if( len & 0xFFFFFFFF00000000 ){
         pval = _par_pack_slice( p, PAR_TYPE64_SIZE );
-        *(uint_fast64_t*)(pval+1) = (uint_fast64_t)len;
+        *(uint_fast64_t*)(pval+PAR_TYPE_SIZE) = (uint_fast64_t)len;
         pval->data.flag = PAR_F_SIZE64;
     }
     // 32bit
     else if( len & 0xFFFF0000 ){
         pval = _par_pack_slice( p, PAR_TYPE32_SIZE );
-        *(uint_fast32_t*)(pval+1) = (uint_fast32_t)len;
+        *(uint_fast32_t*)(pval+PAR_TYPE_SIZE) = (uint_fast32_t)len;
         pval->data.flag = PAR_F_SIZE32;
     }
     // 16bit
     else if( len & 0xFF00 ){
         pval = _par_pack_slice( p, PAR_TYPE16_SIZE );
-        *(uint_fast16_t*)(pval+1) = (uint_fast16_t)len;
+        *(uint_fast16_t*)(pval+PAR_TYPE_SIZE) = (uint_fast16_t)len;
         pval->data.flag = PAR_F_SIZE16;
     }
     // 8bit
     else {
         pval = _par_pack_slice( p, PAR_TYPE8_SIZE );
-        *(uint_fast8_t*)(pval+1) = (uint_fast8_t)len;
+        *(uint_fast8_t*)(pval+PAR_TYPE_SIZE) = (uint_fast8_t)len;
         pval->data.flag = PAR_F_SIZE8;
     }
     pval->data.endian = p->endian;
@@ -503,7 +503,7 @@ static inline int par_pack_tbllen( parcel_pack_t *p, size_t idx, size_t len )
             case PAR_K_ARR:
             case PAR_K_MAP:
                 if( pval->data.flag == PAR_F_FIXLEN ){
-                    par_typelen_t *plen = (par_typelen_t*)(pval+1);
+                    par_typelen_t *plen = (par_typelen_t*)(pval+PAR_TYPE_SIZE);
                     *plen = len;
                     return 0;
                 }
@@ -519,11 +519,11 @@ static inline int par_pack_tbllen( parcel_pack_t *p, size_t idx, size_t len )
 
 // packing integeral number
 #define _par_pack_bitint(p,bit,v,f) do { \
-    par_type_t *pval = _par_pack_slice( p, PAR_TYPE ## bit ## _SIZE ); \
+    par_type_t *pval = _par_pack_slice( p, PAR_TYPE##bit##_SIZE ); \
     pval->data.endian = p->endian; \
     pval->data.flag = (uint_fast8_t)f; \
     pval->data.kind = PAR_K_I##bit; \
-    *((uint_fast ## bit ## _t*)(pval+1)) = (uint_fast ## bit ## _t)v; \
+    *((uint_fast##bit##_t*)(pval+PAR_TYPE_SIZE)) = (uint_fast##bit##_t)v; \
 }while(0)
 
 
@@ -575,11 +575,11 @@ static inline int par_pack_int( parcel_pack_t *p, int_fast64_t num )
 
 // packing floating-point number
 #define _par_pack_bitfloat(p,bit,v,f) do { \
-    par_type_t *pval = _par_pack_slice( p, PAR_TYPE ## bit ## _SIZE ); \
+    par_type_t *pval = _par_pack_slice( p, PAR_TYPE##bit##_SIZE ); \
     pval->data.endian = p->endian; \
     pval->data.flag = (uint_fast8_t)f; \
     pval->data.kind = PAR_K_F##bit; \
-    *((par_float ## bit ## _t*)(pval+1)) = (par_float ## bit ## _t)v; \
+    *((par_float##bit##_t*)(pval+PAR_TYPE_SIZE)) = (par_float##bit##_t)v; \
 }while(0)
 
 static inline int par_pack_float( parcel_pack_t *p, double num )
