@@ -165,8 +165,6 @@ typedef union {
     } data;
 } par_type_t;
 
-#define PAR_TYPEX_MAXLEN    0xFFFFFFFFFFFFFFFULL
-
 typedef uint_fast64_t par_typelen_t;
 
 // partype_t + uint_fast64_t
@@ -497,10 +495,6 @@ static inline int par_pack_tbllen( parcel_pack_t *p, size_t idx, size_t len )
         
         if( idx > p->cur || ( idx + PAR_TYPEX_SIZE ) > p->cur ){
             errno = EDOM;
-            return -1;
-        }
-        else if( len > PAR_TYPEX_MAXLEN ){
-            errno = EINVAL;
             return -1;
         }
         
