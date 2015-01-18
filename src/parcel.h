@@ -55,7 +55,6 @@ static inline uint_fast32_t par_swap32( uint_fast32_t val )
 
 // MARK: parcel format
 
-
 #define PAR_INFO_FIELDS \
     uint_fast8_t endian:1; \
     uint_fast8_t flag:2; \
@@ -166,54 +165,32 @@ typedef union {
     } data;
 } par_type_t;
 
-
 #define PAR_TYPEX_MAXLEN    0xFFFFFFFFFFFFFFFULL
-
-typedef union {
-    uint_fast8_t size[9];
-    struct {
-        PAR_INFO_FIELDS;
-        uint_fast8_t len[8];
-    } data;
-} par_typex_t;
 
 typedef uint_fast64_t par_typelen_t;
 
-
-typedef union {
-    uint_fast8_t size[2];
-    struct {
-        PAR_INFO_FIELDS;
-        uint_fast8_t val[1];
-    } data;
-} par_type8_t;
-
-
-typedef union {
-    uint_fast8_t size[3];
-    struct {
-        PAR_INFO_FIELDS;
-        uint_fast8_t val[2];
-    } data;
-} par_type16_t;
-
-
-typedef union {
-    uint_fast8_t size[5];
-    struct {
-        PAR_INFO_FIELDS;
-        uint_fast8_t val[4];
-    } data;
-} par_type32_t;
-
-
+// partype_t + uint_fast64_t
 typedef union {
     uint_fast8_t size[9];
-    struct {
-        PAR_INFO_FIELDS;
-        uint_fast8_t val[8];
-    } data;
-} par_type64_t;
+} par_typex_t;
+
+// partype_t + uint_fast8_t
+typedef union {
+    uint_fast8_t size[2];
+} par_type8_t;
+
+// partype_t + uint_fast16_t
+typedef union {
+    uint_fast8_t size[3];
+} par_type16_t;
+
+// partype_t + uint_fast32_t
+typedef union {
+    uint_fast8_t size[5];
+} par_type32_t;
+
+// partype_t + uint_fast64_t
+typedef par_typex_t par_type64_t;
 
 
 // par_type[8-64]_t size
@@ -546,6 +523,7 @@ static inline int par_pack_tbllen( parcel_pack_t *p, size_t idx, size_t len )
 }
 
 
+// packing integeral number
 #define _par_pack_bitint(p,bit,v,f) do { \
     par_type_t *pval = _par_pack_slice( p, PAR_TYPE ## bit ## _SIZE ); \
     pval->data.endian = p->endian; \
@@ -601,6 +579,7 @@ static inline int par_pack_int( parcel_pack_t *p, int_fast64_t num )
 }
 
 
+// packing floating-point number
 #define _par_pack_bitfloat(p,bit,v,f) do { \
     par_type_t *pval = _par_pack_slice( p, PAR_TYPE ## bit ## _SIZE ); \
     pval->data.endian = p->endian; \
@@ -609,8 +588,6 @@ static inline int par_pack_int( parcel_pack_t *p, int_fast64_t num )
     *((par_float ## bit ## _t*)(pval+1)) = (par_float ## bit ## _t)v; \
 }while(0)
 
-
-// float
 static inline int par_pack_float( parcel_pack_t *p, double num )
 {
     if( num == 0.0 ){
@@ -627,6 +604,7 @@ static inline int par_pack_float( parcel_pack_t *p, double num )
 }
 
 
+
 // MARK: unpacking
 // bin data
 typedef struct {
@@ -637,25 +615,19 @@ typedef struct {
 
 
 #define _par_unpack_bitint(cur,t,bit,ext) do { \
-    par_type ## bit ## _t *pval = (par_type ## bit ## _t*)t; \
-    ext->data.endian = pval->data.endian; \
-    ext->data.flag = pval->data.flag; \
     if( ext->data.flag ){ \
-        ext->data.val.i##bit = *(int_fast ## bit ## _t*)pval->data.val; \
+        ext->data.val.i##bit = *(int_fast ## bit ## _t*)(t+1); \
     } \
     else { \
-        ext->data.val.u##bit = *(uint_fast ## bit ## _t*)pval->data.val; \
+        ext->data.val.u##bit = *(uint_fast ## bit ## _t*)(t+1); \
     } \
-    *(cur) += sizeof( par_type ## bit ## _t ); \
+    *(cur) += PAR_TYPE ## bit ## _SIZE; \
 }while(0)
 
 
 #define _par_unpack_bitfloat(cur,t,bit,ext) do { \
-    par_type ## bit ## _t *pval = (par_type ## bit ## _t*)t; \
-    ext->data.endian = pval->data.endian; \
-    ext->data.flag = pval->data.flag; \
-    ext->data.val.f##bit = *(par_float ## bit ## _t*)pval->data.val; \
-    *(cur) += sizeof( par_type ## bit ## _t ); \
+    ext->data.val.f##bit = *(par_float ## bit ## _t*)(t+1); \
+    *(cur) += PAR_TYPE ## bit ## _SIZE; \
 }while(0)
 
 
