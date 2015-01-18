@@ -36,22 +36,6 @@
 #include <errno.h>
 
 
-// MARK: endian
-static inline uint_fast8_t par_swap8( uint_fast8_t val )
-{
-    return val;
-}
-
-static inline uint_fast16_t par_swap16( uint_fast16_t val )
-{
-    return (uint_fast16_t)(val>>8) | (uint_fast16_t)(val<<8);
-}
-
-static inline uint_fast32_t par_swap32( uint_fast32_t val )
-{
-    return val;
-}
-
 
 // MARK: parcel format
 
@@ -203,24 +187,21 @@ typedef par_typex_t par_type64_t;
 // to use unpack
 typedef double par_float64_t;
 
-typedef union {
-    uint_fast8_t size[17];
-    struct {
-        PAR_INFO_FIELDS;
-        uint_fast64_t len;
-        union  {
-            char *str;
-            uint_fast8_t u8;
-            uint_fast16_t u16;
-            uint_fast32_t u32;
-            uint_fast64_t u64;
-            int_fast8_t i8;
-            int_fast16_t i16;
-            int_fast32_t i32;
-            int_fast64_t i64;
-            par_float64_t f64;
-        } val;
-    } data;
+typedef struct {
+    PAR_INFO_FIELDS;
+    uint_fast64_t len;
+    union {
+        char *str;
+        int_fast8_t i8;
+        uint_fast8_t u8;
+        int_fast16_t i16;
+        uint_fast16_t u16;
+        int_fast32_t i32;
+        uint_fast32_t u32;
+        int_fast64_t i64;
+        uint_fast64_t u64;
+        par_float64_t f64;
+    } val;
 } par_extract_t;
 
 #undef PAR_INFO_FIELDS
@@ -602,26 +583,68 @@ static inline int par_pack_float( parcel_pack_t *p, double num )
 // MARK: unpacking
 // bin data
 typedef struct {
+    uint_fast8_t endian;
     size_t cur;
     size_t blksize;
     void *mem;
 } parcel_unpack_t;
 
 
-#define _par_unpack_bitint(cur,t,bit,ext) do { \
-    if( ext->data.flag ){ \
-        ext->data.val.i##bit = *(int_fast ## bit ## _t*)(t+1); \
-    } \
-    else { \
-        ext->data.val.u##bit = *(uint_fast ## bit ## _t*)(t+1); \
-    } \
-    *(cur) += PAR_TYPE ## bit ## _SIZE; \
+static inline void par_unpack_init( parcel_unpack_t *p, void *mem, 
+                                    size_t blksize )
+{
+    static const int endian = 1;
+    
+    // 0: little-endian, 1: big-endian
+    p->endian = !(*(char*)&endian);
+    p->cur = 0;
+    p->mem = mem;
+    p->blksize = blksize;
+}
+
+
+// swap byteorder
+#define _par_bswap8(v)
+
+#define _par_bswap16(v) do { \
+    v = ((((v)>>8)&0x00FF)|(((v)<<8)&0xFF00)); \
+}while(0)
+
+#define _par_bswap32(v) do { \
+    v = ((((v)>>24)&0x000000FF)|(((v)>>8)&0x0000FF00) | \
+         (((v)<<8)&0x00FF0000)|(((v)<<24)&0xFF000000)); \
+}while(0)
+
+#define _par_bswap64(v) do { \
+    v = ((((v)>>56)&0x00000000000000FF)|(((v)>>40)&0x000000000000FF00) | \
+         (((v)>>24)&0x0000000000FF0000)|(((v)>>8)&0x00000000FF000000) | \
+         (((v)<<8)&0x000000FF00000000)|(((v)<<24)&0x0000FF0000000000) | \
+         (((v)<<40)&0x00FF000000000000)|(((v)<<56)&0xFF00000000000000)); \
 }while(0)
 
 
-#define _par_unpack_bitfloat(cur,t,bit,ext) do { \
-    ext->data.val.f##bit = *(par_float ## bit ## _t*)(t+1); \
-    *(cur) += PAR_TYPE ## bit ## _SIZE; \
+#define _par_unpack_vstr(ext,t,bit,e) do { \
+    ext->len = *(uint_fast##bit##_t*)(type+PAR_TYPE_SIZE); \
+    ext->val.str = (char*)(t+PAR_TYPE##bit##_SIZE); \
+    if( bit > 8 && e != ext->endian ){ \
+        _par_bswap##bit( ext->len ); \
+    } \
+}while(0)
+
+
+#define _par_unpack_vint(ext,t,bit,e) do { \
+    ext->val.u##bit = *(uint_fast##bit##_t*)(t+PAR_TYPE_SIZE); \
+    if( bit > 8 && e != ext->endian ){ \
+        _par_bswap##bit( ext->val.u##bit ); \
+    } \
+}while(0)
+
+
+#define _par_unpack_vfloat(ext,t,bit,e) do { \
+    ext->val.f##bit = *(par_float##bit##_t*)(t+PAR_TYPE_SIZE); \
+    if( e != ext->endian ){ \
+        _par_bswap##bit( ext->val.u##bit ); \
+    } \
 }while(0)
 
 
@@ -634,38 +657,34 @@ static inline int par_unpack( parcel_unpack_t *p, par_extract_t *ext )
         type = (par_type_t*)p->mem + p->cur;
         
         // set endian, kind and flag value
-        ext->data.kind = type->data.kind;
-        ext->data.flag = type->data.flag;
-        ext->data.endian = type->data.endian;
+        ext->kind = type->data.kind;
+        ext->flag = type->data.flag;
+        ext->endian = type->data.endian;
         // 1 byte types
         if( type->data.kind <= PAR_K_I0 ){
-            p->cur += sizeof( par_type_t );
+            p->cur += PAR_TYPE_SIZE;
         }
         // 8 byte types
         else if( type->data.kind == PAR_K_STR )
         {
             // len: *(uint_fast[8-64]_t*)(mem + cur + PAR_TYPE_SIZE)
             // val: mem + cur + PAR_TYPE[8-64]_SIZE
-            switch( ext->data.flag ){
+            switch( ext->flag ){
                 case PAR_F_SIZE8:
-                    ext->data.len = *(uint_fast8_t*)(type+1);
-                    ext->data.val.str = (char*)(type+PAR_TYPE8_SIZE);
-                    p->cur += PAR_TYPE8_SIZE + ext->data.len;
+                    _par_unpack_vstr( ext, type, 8, p->endian );
+                    p->cur += PAR_TYPE8_SIZE + ext->len;
                 break;
                 case PAR_F_SIZE16:
-                    ext->data.len = *(uint_fast16_t*)(type+1);
-                    ext->data.val.str = (char*)(type+PAR_TYPE16_SIZE);
-                    p->cur += PAR_TYPE16_SIZE + ext->data.len;
+                    _par_unpack_vstr( ext, type, 16, p->endian );
+                    p->cur += PAR_TYPE16_SIZE + ext->len;
                 break;
                 case PAR_F_SIZE32:
-                    ext->data.len = *(uint_fast32_t*)(type+1);
-                    ext->data.val.str = (char*)(type+PAR_TYPE32_SIZE);
-                    p->cur += PAR_TYPE32_SIZE + ext->data.len;
+                    _par_unpack_vstr( ext, type, 32, p->endian );
+                    p->cur += PAR_TYPE32_SIZE + ext->len;
                 break;
                 case PAR_F_SIZE64:
-                    ext->data.len = *(uint_fast64_t*)(type+1);
-                    ext->data.val.str = (char*)(type+PAR_TYPE64_SIZE);
-                    p->cur += PAR_TYPE64_SIZE + ext->data.len;
+                    _par_unpack_vstr( ext, type, 64, p->endian );
+                    p->cur += PAR_TYPE64_SIZE + ext->len;
                 break;
                 default:
                     errno = EINVAL;
@@ -674,32 +693,42 @@ static inline int par_unpack( parcel_unpack_t *p, par_extract_t *ext )
         }
         else if( type->data.kind <= PAR_K_MAP )
         {
-            if( type->data.flag == PAR_F_FIXLEN ){
-                ext->data.len = *((par_typelen_t*)(type+1));
+            if( type->data.flag == PAR_F_FIXLEN )
+            {
+                ext->len = *((par_typelen_t*)(type+PAR_TYPE_SIZE));
+                // swap byteorder
+                if( p->endian != ext->endian ){
+                    _par_bswap64( ext->len );
+                }
                 p->cur += PAR_TYPEX_SIZE;
             }
             else {
-                ext->data.len = 0;
-                p->cur += sizeof( par_type_t );
+                ext->len = 0;
+                p->cur += PAR_TYPE_SIZE;
             }
         }
         // number
         // endian = 1:big-endian, 0:littel-endian
         // flag = 1:sign, 0:unsign
         else if( type->data.kind == PAR_K_I8 ){
-            _par_unpack_bitint( &p->cur, type, 8, ext );
+            _par_unpack_vint( ext, type, 8, p->endian );
+            p->cur += PAR_TYPE8_SIZE;
         }
         else if( type->data.kind == PAR_K_I16 ){
-            _par_unpack_bitint( &p->cur, type, 16, ext );
+            _par_unpack_vint( ext, type, 16, p->endian );
+            p->cur += PAR_TYPE16_SIZE;
         }
         else if( type->data.kind == PAR_K_I32 ){
-            _par_unpack_bitint( &p->cur, type, 32, ext );
+            _par_unpack_vint( ext, type, 32, p->endian );
+            p->cur += PAR_TYPE32_SIZE;
         }
         else if( type->data.kind == PAR_K_I64 ){
-            _par_unpack_bitint( &p->cur, type, 64, ext );
+            _par_unpack_vint( ext, type, 64, p->endian );
+            p->cur += PAR_TYPE64_SIZE;
         }
         else if( type->data.kind == PAR_K_F64 ){
-            _par_unpack_bitfloat( &p->cur, type, 64, ext );
+            _par_unpack_vfloat( ext, type, 64, p->endian );
+            p->cur += PAR_TYPE64_SIZE;
         }
         // unknown data type
         else {
