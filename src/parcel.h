@@ -26,8 +26,8 @@
  *
  */
 
-#ifndef ___LUA_PARCEL___
-#define ___LUA_PARCEL___
+#ifndef ___PARCEL_H___
+#define ___PARCEL_H___
 
 
 #include <stdlib.h>
