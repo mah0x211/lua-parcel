@@ -36,13 +36,19 @@
 #include <errno.h>
 
 
-
 // MARK: parcel format
 
 #define PAR_INFO_FIELDS \
     uint_fast8_t endian:1; \
     uint_fast8_t flag:2; \
     uint_fast8_t kind:5
+
+
+#define PAR_INFO_BYTE_FIELDS \
+    uint_fast8_t endian; \
+    uint_fast8_t flag; \
+    uint_fast8_t kind
+
 
 // endianness
 #define PAR_E_LIT    0x0
@@ -84,7 +90,7 @@ enum {
     PAR_K_INF,
     PAR_K_I0,
     
-    // 1+[0-8] byte types
+    // 1+[1-8] byte types
     // flag: byte array size
     PAR_K_STR,
     
@@ -188,7 +194,7 @@ typedef par_typex_t par_type64_t;
 typedef double par_float64_t;
 
 typedef struct {
-    PAR_INFO_FIELDS;
+    PAR_INFO_BYTE_FIELDS;
     uint_fast64_t len;
     union {
         char *str;
@@ -205,6 +211,7 @@ typedef struct {
 } par_extract_t;
 
 #undef PAR_INFO_FIELDS
+#undef PAR_INFO_BYTE_FIELDS
 
 
 // MARK: default memory block size
