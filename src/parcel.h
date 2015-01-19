@@ -630,25 +630,27 @@ static inline void par_unpack_init( parcel_unpack_t *p, void *mem,
 }while(0)
 
 
-#define _par_unpack_vstr(ext,t,bit,e) do { \
+// len: *(uint_fast[8-64]_t*)(mem + cur + PAR_TYPE_SIZE)
+// val: mem + cur + PAR_TYPE[8-64]_SIZE
+#define _par_unpack_vstr(ext,type,bit,e) do { \
     ext->len = *(uint_fast##bit##_t*)(type+PAR_TYPE_SIZE); \
-    ext->val.str = (char*)(t+PAR_TYPE##bit##_SIZE); \
+    ext->val.str = (char*)(type+PAR_TYPE##bit##_SIZE); \
     if( bit > 8 && e != ext->endian ){ \
         _par_bswap##bit( ext->len ); \
     } \
 }while(0)
 
 
-#define _par_unpack_vint(ext,t,bit,e) do { \
-    ext->val.u##bit = *(uint_fast##bit##_t*)(t+PAR_TYPE_SIZE); \
+#define _par_unpack_vint(ext,type,bit,e) do { \
+    ext->val.u##bit = *(uint_fast##bit##_t*)(type+PAR_TYPE_SIZE); \
     if( bit > 8 && e != ext->endian ){ \
         _par_bswap##bit( ext->val.u##bit ); \
     } \
 }while(0)
 
 
-#define _par_unpack_vfloat(ext,t,bit,e) do { \
-    ext->val.f##bit = *(par_float##bit##_t*)(t+PAR_TYPE_SIZE); \
+#define _par_unpack_vfloat(ext,type,bit,e) do { \
+    ext->val.f##bit = *(par_float##bit##_t*)(type+PAR_TYPE_SIZE); \
     if( e != ext->endian ){ \
         _par_bswap##bit( ext->val.u##bit ); \
     } \
@@ -657,11 +659,9 @@ static inline void par_unpack_init( parcel_unpack_t *p, void *mem,
 
 static inline int par_unpack( parcel_unpack_t *p, par_extract_t *ext )
 {
-    par_type_t *type = NULL;
-
     if( p->cur < p->blksize )
     {
-        type = (par_type_t*)p->mem + p->cur;
+        par_type_t *type = (par_type_t*)p->mem + p->cur;
         
         // set endian, kind and flag value
         ext->kind = type->data.kind;
