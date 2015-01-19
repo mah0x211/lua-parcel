@@ -49,9 +49,9 @@
     luaL_unref( L, LUA_REGISTRYINDEX, ref )
 
 
-static int pack_val( parcel_pack_t *b, lua_State *L, int idx );
+static int pack_val( par_pack_t *b, lua_State *L, int idx );
 
-static int pack_tbl( parcel_pack_t *b, lua_State *L, int idx, int ktype, 
+static int pack_tbl( par_pack_t *b, lua_State *L, int idx, int ktype, 
                      size_t vidx )
 {
     size_t len = 0;
@@ -78,7 +78,7 @@ static int pack_tbl( parcel_pack_t *b, lua_State *L, int idx, int ktype,
 }
 
 
-static int pack_val( parcel_pack_t *p, lua_State *L, int idx )
+static int pack_val( par_pack_t *p, lua_State *L, int idx )
 {
     const char *str = NULL;
     double num = 0;
@@ -216,7 +216,7 @@ static int pack_reduce( void *mem, size_t bytes, void *udata )
 static int pack_lua( lua_State *L )
 {
     int argc = lua_gettop( L );
-    parcel_pack_t p;
+    par_pack_t p;
     size_t blksize = 0;
     packreduce_t pr = {
         .L = L,
@@ -273,7 +273,7 @@ static int pack_lua( lua_State *L )
         break;
     }
     
-    // init parcel_pack_t
+    // init par_pack_t
     if( ( rv = par_pack_init( &p, blksize, reducer, udata ) ) == 0 )
     {
         // pack value
@@ -309,9 +309,9 @@ static int pack_lua( lua_State *L )
 
 
 
-static int unpack_val( lua_State *L, parcel_unpack_t *p );
+static int unpack_val( lua_State *L, par_unpack_t *p );
 
-static int unpack_tbl( lua_State *L, parcel_unpack_t *p, size_t len )
+static int unpack_tbl( lua_State *L, par_unpack_t *p, size_t len )
 {
     // unpack key-value
     if( len )
@@ -349,7 +349,7 @@ UNPACK_KV:
 }
 
 
-static int unpack_val( lua_State *L, parcel_unpack_t *p )
+static int unpack_val( lua_State *L, par_unpack_t *p )
 {
     par_extract_t ext;
 
@@ -451,7 +451,7 @@ static int unpack_lua( lua_State *L )
 {
     size_t len = 0;
     const char *mem = (const char*)luaL_checklstring( L, 1, &len );
-    parcel_unpack_t p;
+    par_unpack_t p;
     
     par_unpack_init( &p, (void*)mem, len );
     // unpack

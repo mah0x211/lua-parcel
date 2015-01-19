@@ -296,10 +296,10 @@ typedef struct {
     // stream
     par_packreduce_t reducer;
     void *udata;
-} parcel_pack_t;
+} par_pack_t;
 
 
-static inline int par_pack_init( parcel_pack_t *p, size_t blksize, 
+static inline int par_pack_init( par_pack_t *p, size_t blksize, 
                                  par_packreduce_t reducer, void *udata )
 {
     if( !blksize ){
@@ -333,7 +333,7 @@ static inline int par_pack_init( parcel_pack_t *p, size_t blksize,
 }
 
 
-static inline void par_pack_dispose( parcel_pack_t *p )
+static inline void par_pack_dispose( par_pack_t *p )
 {
     if( p->mem ){
         free( p->mem );
@@ -342,7 +342,7 @@ static inline void par_pack_dispose( parcel_pack_t *p )
 }
 
 
-static inline int _par_pack_increase( parcel_pack_t *p, size_t bytes )
+static inline int _par_pack_increase( par_pack_t *p, size_t bytes )
 {
     if( p->reducer )
     {
@@ -396,7 +396,7 @@ static inline int _par_pack_increase( parcel_pack_t *p, size_t bytes )
 }
 
 
-static inline void *_par_pack_update_cur( parcel_pack_t *p, size_t bytes )
+static inline void *_par_pack_update_cur( par_pack_t *p, size_t bytes )
 {
     void *mem = p->mem + p->cur;
     
@@ -415,7 +415,7 @@ static inline void *_par_pack_update_cur( parcel_pack_t *p, size_t bytes )
 })
 
 
-static inline int _par_pack_type( parcel_pack_t *p, uint8_t kind, uint8_t flag )
+static inline int _par_pack_type( par_pack_t *p, uint8_t kind, uint8_t flag )
 {
     par_type_t *pval = _par_pack_slice( p, PAR_TYPE_SIZE );
     
@@ -435,7 +435,7 @@ static inline int _par_pack_type( parcel_pack_t *p, uint8_t kind, uint8_t flag )
 #define par_pack_zero(p)        _par_pack_type(p,PAR_K_I0,0)
 
 
-static inline int par_pack_str( parcel_pack_t *p, void *val, size_t len )
+static inline int par_pack_str( par_pack_t *p, void *val, size_t len )
 {
     par_type_t *pval = NULL;
     
@@ -511,7 +511,7 @@ COPY2BLOCK:
 }
 
 
-static inline int _par_pack_typex( parcel_pack_t *p, uint8_t kind, size_t *idx )
+static inline int _par_pack_typex( par_pack_t *p, uint8_t kind, size_t *idx )
 {
     if( !p->reducer )
     {
@@ -533,7 +533,7 @@ static inline int _par_pack_typex( parcel_pack_t *p, uint8_t kind, size_t *idx )
 #define par_pack_map(p,idx)     _par_pack_typex(p,PAR_K_MAP,idx)
 
 
-static inline int par_pack_tbllen( parcel_pack_t *p, size_t idx, size_t len )
+static inline int par_pack_tbllen( par_pack_t *p, size_t idx, size_t len )
 {
     // append eos
     if( p->reducer ){
@@ -578,7 +578,7 @@ static inline int par_pack_tbllen( parcel_pack_t *p, size_t idx, size_t len )
 
 
 // positive integer
-static inline int par_pack_uint( parcel_pack_t *p, uint_fast64_t num )
+static inline int par_pack_uint( par_pack_t *p, uint_fast64_t num )
 {
     if( num == 0 ){
         return par_pack_zero( p );
@@ -601,7 +601,7 @@ static inline int par_pack_uint( parcel_pack_t *p, uint_fast64_t num )
 
 
 // negative integer
-static inline int par_pack_int( parcel_pack_t *p, int_fast64_t num )
+static inline int par_pack_int( par_pack_t *p, int_fast64_t num )
 {
     if( num == 0 ){
         return par_pack_zero( p );
@@ -632,7 +632,7 @@ static inline int par_pack_int( parcel_pack_t *p, int_fast64_t num )
     *((par_float##bit##_t*)(pval+PAR_TYPE_SIZE)) = (par_float##bit##_t)v; \
 }while(0)
 
-static inline int par_pack_float( parcel_pack_t *p, double num )
+static inline int par_pack_float( par_pack_t *p, double num )
 {
     if( num == 0.0 ){
         return par_pack_zero( p );
@@ -656,11 +656,10 @@ typedef struct {
     size_t cur;
     size_t blksize;
     void *mem;
-} parcel_unpack_t;
+} par_unpack_t;
 
 
-static inline void par_unpack_init( parcel_unpack_t *p, void *mem, 
-                                    size_t blksize )
+static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 {
     static const int endian = 1;
     
@@ -719,7 +718,7 @@ static inline void par_unpack_init( parcel_unpack_t *p, void *mem,
 }while(0)
 
 
-static inline int par_unpack( parcel_unpack_t *p, par_extract_t *ext )
+static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
 {
     if( p->cur < p->blksize )
     {
