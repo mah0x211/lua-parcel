@@ -35,6 +35,57 @@
 #include <stdint.h>
 #include <errno.h>
 
+// MARK: errors
+
+typedef enum {
+    // no error
+    PARCEL_OK = 0,
+    // ENOMEM: cannot allocate memory
+    PARCEL_ENOMEM = ENOMEM,
+    // ENOBUFS: no memory block space available
+    PARCEL_ENOBLKS = ENOBUFS,
+    // EILSEQ: illegal byte sequence
+    PARCEL_EILSEQ = EILSEQ,
+    
+    // packing
+    // EDOM: index argument out of domain
+    PARCEL_EDOM = EDOM,
+    
+    // unpacking
+    // ENODATA: no message available on memory block
+    PARCEL_ENODATA = ENODATA
+} par_error_t;
+
+
+static inline char *par_strerror( par_error_t err )
+{
+    switch ( err ){
+        // generic error
+        case PARCEL_OK:
+            return "no error";
+        
+        case PARCEL_ENOMEM:
+            return "cannot allocate memory";
+        
+        case PARCEL_ENOBLKS:
+            return "no memory block space available";
+        
+        case PARCEL_EILSEQ:
+            return "illegal byte sequence";
+        
+        // packing error
+        case PARCEL_EDOM:
+            return "index argument out of domain";
+        
+        // unpacking error
+        case PARCEL_ENODATA:
+            return "no data available on memory block";
+        
+        default:
+            return strerror( errno );
+    }
+}
+
 
 // MARK: parcel format
 
@@ -223,8 +274,7 @@ typedef struct {
 // check available block space
 #define _par_check_blkspc(blksize,cur,req) do { \
     if( (cur) >= (blksize) || ((blksize)-(cur)) < (req) ){ \
-        /* No buffer space available */ \
-        errno = ENOBUFS; \
+        errno = PARCEL_ENOBLKS; \
         return -1; \
     } \
 }while(0)
@@ -337,7 +387,7 @@ static inline int _par_pack_increase( parcel_pack_t *p, size_t bytes )
                 }
             }
             else {
-                errno = ENOMEM;
+                errno = PARCEL_ENOMEM;
             }
         }
     }
@@ -494,7 +544,7 @@ static inline int par_pack_tbllen( parcel_pack_t *p, size_t idx, size_t len )
         par_type_t *pval = NULL;
         
         if( idx > p->cur || ( idx + PAR_TYPEX_SIZE ) > p->cur ){
-            errno = EDOM;
+            errno = PARCEL_EDOM;
             return -1;
         }
         
@@ -509,8 +559,8 @@ static inline int par_pack_tbllen( parcel_pack_t *p, size_t idx, size_t len )
                 }
         }
         
-        // invalid type
-        errno = EINVAL;
+        // illegal byte sequence
+        errno = PARCEL_EILSEQ;
     }
     
     return -1;
@@ -705,8 +755,9 @@ static inline int par_unpack( parcel_unpack_t *p, par_extract_t *ext )
                         _par_unpack_vstr( ext, type, 64, p->endian );
                         p->cur += PAR_TYPE64_SIZE + ext->len;
                     break;
+                    // illegal byte sequence
                     default:
-                        errno = EINVAL;
+                        errno = PARCEL_EILSEQ;
                         return -1;
                 }
             break;
@@ -754,9 +805,9 @@ static inline int par_unpack( parcel_unpack_t *p, par_extract_t *ext )
                 _par_unpack_vfloat( ext, type, 64, p->endian );
                 p->cur += PAR_TYPE64_SIZE;
             break;
-            // unknown data type
+            // illegal byte sequence
             default:
-                errno = EINVAL;
+                errno = PARCEL_EILSEQ;
                 return -1;
         }
         
@@ -764,8 +815,8 @@ static inline int par_unpack( parcel_unpack_t *p, par_extract_t *ext )
     }
     
     // end-of-data
-    // errno = ENODATA
-    
+    // no message available on memory block
+    errno = PARCEL_ENODATA;
     return 0;
 }
 
