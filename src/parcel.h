@@ -72,6 +72,8 @@
 #define PAR_F_SIZE32    0x2
 #define PAR_F_SIZE64    0x3
 
+#define _par_fsize2byte(f)  (1<<(f))
+
 // array/map length
 #define PAR_F_FIXLEN    PAR_F_NONE
 #define PAR_F_VARLEN    0x1
@@ -216,6 +218,16 @@ typedef struct {
 
 // MARK: default memory block size
 #define PAR_DEFAULT_BLK_SIZE    1024
+
+
+// check available block space
+#define _par_check_blkspc(blksize,cur,req) do { \
+    if( (cur) >= (blksize) || ((blksize)-(cur)) < (req) ){ \
+        /* No buffer space available */ \
+        errno = ENOBUFS; \
+        return -1; \
+    } \
+}while(0)
 
 
 // MARK: packing
@@ -667,86 +679,92 @@ static inline int par_unpack( parcel_unpack_t *p, par_extract_t *ext )
         ext->kind = type->data.kind;
         ext->flag = type->data.flag;
         ext->endian = type->data.endian;
-        // 1 byte types
-        if( type->data.kind <= PAR_K_I0 ){
-            p->cur += PAR_TYPE_SIZE;
-        }
-        // 8 byte types
-        else if( type->data.kind == PAR_K_STR )
-        {
-            // len: *(uint_fast[8-64]_t*)(mem + cur + PAR_TYPE_SIZE)
-            // val: mem + cur + PAR_TYPE[8-64]_SIZE
-            switch( ext->flag ){
-                case PAR_F_SIZE8:
-                    _par_unpack_vstr( ext, type, 8, p->endian );
-                    p->cur += PAR_TYPE8_SIZE + ext->len;
-                break;
-                case PAR_F_SIZE16:
-                    _par_unpack_vstr( ext, type, 16, p->endian );
-                    p->cur += PAR_TYPE16_SIZE + ext->len;
-                break;
-                case PAR_F_SIZE32:
-                    _par_unpack_vstr( ext, type, 32, p->endian );
-                    p->cur += PAR_TYPE32_SIZE + ext->len;
-                break;
-                case PAR_F_SIZE64:
-                    _par_unpack_vstr( ext, type, 64, p->endian );
-                    p->cur += PAR_TYPE64_SIZE + ext->len;
-                break;
-                default:
-                    errno = EINVAL;
-                    return -1;
-            }
-        }
-        else if( type->data.kind <= PAR_K_MAP )
-        {
-            if( type->data.flag == PAR_F_FIXLEN )
-            {
-                ext->len = *((par_typelen_t*)(type+PAR_TYPE_SIZE));
-                // swap byteorder
-                if( p->endian != ext->endian ){
-                    _par_bswap64( ext->len );
-                }
-                p->cur += PAR_TYPEX_SIZE;
-            }
-            else {
-                ext->len = 0;
+        
+        switch( ext->kind ){
+            // 1 byte types
+            case PAR_K_NIL ... PAR_K_I0:
                 p->cur += PAR_TYPE_SIZE;
-            }
-        }
-        // number
-        // endian = 1:big-endian, 0:littel-endian
-        // flag = 1:sign, 0:unsign
-        else if( type->data.kind == PAR_K_I8 ){
-            _par_unpack_vint( ext, type, 8, p->endian );
-            p->cur += PAR_TYPE8_SIZE;
-        }
-        else if( type->data.kind == PAR_K_I16 ){
-            _par_unpack_vint( ext, type, 16, p->endian );
-            p->cur += PAR_TYPE16_SIZE;
-        }
-        else if( type->data.kind == PAR_K_I32 ){
-            _par_unpack_vint( ext, type, 32, p->endian );
-            p->cur += PAR_TYPE32_SIZE;
-        }
-        else if( type->data.kind == PAR_K_I64 ){
-            _par_unpack_vint( ext, type, 64, p->endian );
-            p->cur += PAR_TYPE64_SIZE;
-        }
-        else if( type->data.kind == PAR_K_F64 ){
-            _par_unpack_vfloat( ext, type, 64, p->endian );
-            p->cur += PAR_TYPE64_SIZE;
-        }
-        // unknown data type
-        else {
-            errno = EINVAL;
-            return -1;
+            break;
+            case PAR_K_STR:
+                _par_check_blkspc( p->blksize, p->cur, 
+                                   _par_fsize2byte( ext->flag ) );
+                switch( ext->flag ){
+                    case PAR_F_SIZE8:
+                        _par_unpack_vstr( ext, type, 8, p->endian );
+                        p->cur += PAR_TYPE8_SIZE + ext->len;
+                    break;
+                    case PAR_F_SIZE16:
+                        _par_unpack_vstr( ext, type, 16, p->endian );
+                        p->cur += PAR_TYPE16_SIZE + ext->len;
+                    break;
+                    case PAR_F_SIZE32:
+                        _par_unpack_vstr( ext, type, 32, p->endian );
+                        p->cur += PAR_TYPE32_SIZE + ext->len;
+                    break;
+                    case PAR_F_SIZE64:
+                        _par_unpack_vstr( ext, type, 64, p->endian );
+                        p->cur += PAR_TYPE64_SIZE + ext->len;
+                    break;
+                    default:
+                        errno = EINVAL;
+                        return -1;
+                }
+            break;
+            case PAR_K_ARR ... PAR_K_MAP:
+                if( type->data.flag == PAR_F_FIXLEN )
+                {
+                    _par_check_blkspc( p->blksize, p->cur, PAR_TYPE_SIZE );
+                    ext->len = *((par_typelen_t*)(type+PAR_TYPE_SIZE));
+                    // swap byteorder
+                    if( p->endian != ext->endian ){
+                        _par_bswap64( ext->len );
+                    }
+                    p->cur += PAR_TYPEX_SIZE;
+                }
+                else {
+                    ext->len = 0;
+                    p->cur += PAR_TYPE_SIZE;
+                }
+            break;
+            // number
+            // endian = 1:big-endian, 0:littel-endian
+            // flag = 1:sign, 0:unsign
+            case PAR_K_I8:
+                _par_check_blkspc( p->blksize, p->cur, PAR_TYPE8_SIZE );
+                _par_unpack_vint( ext, type, 8, p->endian );
+                p->cur += PAR_TYPE8_SIZE;
+            break;
+            case PAR_K_I16:
+                _par_check_blkspc( p->blksize, p->cur, PAR_TYPE16_SIZE );
+                _par_unpack_vint( ext, type, 16, p->endian );
+                p->cur += PAR_TYPE16_SIZE;
+            break;
+            case PAR_K_I32:
+                _par_check_blkspc( p->blksize, p->cur, PAR_TYPE32_SIZE );
+                _par_unpack_vint( ext, type, 32, p->endian );
+                p->cur += PAR_TYPE32_SIZE;
+            break;
+            case PAR_K_I64:
+                _par_check_blkspc( p->blksize, p->cur, PAR_TYPE64_SIZE );
+                _par_unpack_vint( ext, type, 64, p->endian );
+                p->cur += PAR_TYPE64_SIZE;
+            break;
+            case PAR_K_F64:
+                _par_check_blkspc( p->blksize, p->cur, PAR_TYPE64_SIZE );
+                _par_unpack_vfloat( ext, type, 64, p->endian );
+                p->cur += PAR_TYPE64_SIZE;
+            break;
+            // unknown data type
+            default:
+                errno = EINVAL;
+                return -1;
         }
         
         return 1;
     }
     
     // end-of-data
+    // errno = ENODATA
     
     return 0;
 }
