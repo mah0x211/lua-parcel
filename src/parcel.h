@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <math.h>
 #include <errno.h>
 
 // MARK: errors
@@ -580,10 +581,7 @@ static inline int par_pack_tbllen( par_pack_t *p, size_t idx, size_t len )
 // positive integer
 static inline int par_pack_uint( par_pack_t *p, uint_fast64_t num )
 {
-    if( num == 0 ){
-        return par_pack_zero( p );
-    }
-    else if( num <= UINT8_MAX ){
+    if( num <= UINT8_MAX ){
         _par_pack_bitint( p, 8, num, PAR_F_UNSIGN );
     }
     else if( num <= UINT16_MAX ){
@@ -603,10 +601,7 @@ static inline int par_pack_uint( par_pack_t *p, uint_fast64_t num )
 // negative integer
 static inline int par_pack_int( par_pack_t *p, int_fast64_t num )
 {
-    if( num == 0 ){
-        return par_pack_zero( p );
-    }
-    else if( num >= INT8_MIN ){
+    if( num >= INT8_MIN ){
         _par_pack_bitint( p, 8, num, PAR_F_SIGNED );
     }
     else if( num >= INT16_MIN ){
@@ -629,24 +624,15 @@ static inline int par_pack_int( par_pack_t *p, int_fast64_t num )
     pval->data.endian = p->endian; \
     pval->data.flag = (uint_fast8_t)f; \
     pval->data.kind = PAR_K_F##bit; \
-    *((par_float##bit##_t*)(pval+PAR_TYPE_SIZE)) = (par_float##bit##_t)v; \
+    *((par_float##bit##_t*)(pval+PAR_TYPE_SIZE)) = (par_float##bit##_t)(v); \
 }while(0)
+
 
 static inline int par_pack_float( par_pack_t *p, double num )
 {
-    if( num == 0.0 ){
-        return par_pack_zero( p );
-    }
-    else if( num > 0.0 ){
-        _par_pack_bitfloat( p, 64, num, PAR_F_UNSIGN );
-    }
-    else {
-        _par_pack_bitfloat( p, 64, num, PAR_F_SIGNED );
-    }
-    
+    _par_pack_bitfloat( p, 64, num, signbit( num ) );
     return 0;
 }
-
 
 
 // MARK: unpacking
