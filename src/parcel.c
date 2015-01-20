@@ -89,7 +89,7 @@ static int pack_val( par_pack_t *p, lua_State *L, int idx )
     switch( lua_type( L, idx ) )
     {
         case LUA_TBOOLEAN:
-            return par_pack_bool( p, lua_toboolean( L, idx ) );
+            return par_pack_bool( p, (uint8_t)lua_toboolean( L, idx ) );
         
         case LUA_TNUMBER:
             num = lua_tonumber( L, idx );
@@ -143,7 +143,7 @@ static int pack_val( par_pack_t *p, lua_State *L, int idx )
     lua_pushnil( L );
     // empty table
     if( !lua_next( L, -2 ) ){
-        return par_pack_tbl( p );
+        return par_pack_empty( p );
     }
     
     // check types
@@ -360,41 +360,41 @@ static int unpack_val( lua_State *L, par_unpack_t *p )
         case 0:
             return 0;
         case 1:
-            switch( ext.kind )
+            switch( ext.isa )
             {
                 // 1 byte pack
                 // nil
-                case PAR_K_NIL:
+                case PAR_ISA_NIL:
                     lua_pushnil( L );
                     return 1;
                 // boolean
                 // flag = 1:true, 0:false
-                case PAR_K_BOL:
-                    lua_pushboolean( L, ext.flag );
+                case PAR_ISA_BOL:
+                    lua_pushboolean( L, ext.attr );
                     return 1;
                 // empty table
-                case PAR_K_TBL:
+                case PAR_ISA_EMP:
                     lua_newtable( L );
                     return 1;
                 // end-of-stream
-                case PAR_K_EOS:
+                case PAR_ISA_EOS:
                     return 2;
                 // nan
-                case PAR_K_NAN:
+                case PAR_ISA_NAN:
                     lua_pushnumber( L, NAN );
                     return 1;
                 // inf
-                case PAR_K_INF:
-                    lua_pushnumber( L, ( ext.flag ) ? -INFINITY : INFINITY );
+                case PAR_ISA_INF:
+                    lua_pushnumber( L, ( ext.attr ) ? -INFINITY : INFINITY );
                     return 1;
                 // zero
-                case PAR_K_I0:
+                case PAR_ISA_I0:
                     lua_pushinteger( L, 0 );
                     return 1;
                 
                 // 8 byte pack
                 // string
-                case PAR_K_STR:
+                case PAR_ISA_STR:
                     lua_pushlstring( L, ext.val.str, ext.len );
                     return 1;
                 
@@ -403,7 +403,7 @@ static int unpack_val( lua_State *L, par_unpack_t *p )
                 // endian = 1:big-endian, 0:littel-endian
                 // flag = 1:sign, 0:unsign
                 #define lstate_push_extint( L, ext, bit ) do { \
-                    if( ext.flag ){ \
+                    if( ext.attr & PAR_MASK_SIGN ){ \
                         lua_pushinteger( L, (lua_Integer)ext.val.i##bit ); \
                     } \
                     else { \
@@ -411,34 +411,34 @@ static int unpack_val( lua_State *L, par_unpack_t *p )
                     } \
                 }while(0)
                 
-                case PAR_K_I8:
+                case PAR_ISA_I8:
                     lstate_push_extint( L, ext, 8 );
                     return 1;
-                case PAR_K_I16:
+                case PAR_ISA_I16:
                     lstate_push_extint( L, ext, 16 );
                     return 1;
-                case PAR_K_I32:
+                case PAR_ISA_I32:
                     lstate_push_extint( L, ext, 32 );
                     return 1;
-                case PAR_K_I64:
+                case PAR_ISA_I64:
                     lstate_push_extint( L, ext, 64 );
                     return 1;
                 
                 #undef lstate_push_extint
                 
-                case PAR_K_F32:
+                case PAR_ISA_F32:
                     lua_pushnumber( L, ext.val.f32 );
                     return 1;
-                case PAR_K_F64:
+                case PAR_ISA_F64:
                     lua_pushnumber( L, ext.val.f64 );
                     return 1;
                 
                 // array
-                case PAR_K_ARR:
+                case PAR_ISA_ARR:
                     lua_createtable( L, (int)ext.len, 0 );
                     return unpack_tbl( L, p, ext.len );
                 // map
-                case PAR_K_MAP:
+                case PAR_ISA_MAP:
                     lua_createtable( L, 0, (int)ext.len );
                     return unpack_tbl( L, p, ext.len );
             }
