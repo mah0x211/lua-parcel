@@ -99,22 +99,21 @@ static int pack_val( par_pack_t *p, lua_State *L, int idx )
             }
             // set inf
             else if( isinf( num ) ){
-                return par_pack_inf( p, num < 0 );
+                return par_pack_inf( p, signbit( num ) );
             }
             // set zero
-            else if( num == 0.0 ){
+            else if( !num ){
                 return par_pack_zero( p );
             }
             // set integer
             else if( modf( num, (double*)&inum ) == 0.0 )
             {
-                // unsigned
-                if( inum > 0.0 ){
-                    return par_pack_uint( p, (uint_fast64_t)num );
-                }
-                
                 // signed
-                return par_pack_int( p, (int_fast64_t)num );
+                if( signbit( inum ) ){
+                    return par_pack_int( p, (int_fast64_t)num );
+                }
+                // unsigned
+                return par_pack_uint( p, (uint_fast64_t)num );
             }
             // set float
             return par_pack_float( p, num );
