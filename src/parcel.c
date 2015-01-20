@@ -116,7 +116,8 @@ static int pack_val( par_pack_t *p, lua_State *L, int idx )
                 return par_pack_uint( p, (uint_fast64_t)num );
             }
             // set float
-            return par_pack_float( p, num );
+            // lua_Number == double
+            return par_pack_float64( p, num );
         
         case LUA_TSTRING:
             str = lua_tolstring( L, idx, &len );
@@ -350,7 +351,7 @@ UNPACK_KV:
 static int unpack_val( lua_State *L, par_unpack_t *p )
 {
     par_extract_t ext;
-
+    
     // unpacking
     switch( par_unpack( p, &ext ) )
     {
@@ -425,6 +426,9 @@ static int unpack_val( lua_State *L, par_unpack_t *p )
                 
                 #undef lstate_push_extint
                 
+                case PAR_K_F32:
+                    lua_pushnumber( L, ext.val.f32 );
+                    return 1;
                 case PAR_K_F64:
                     lua_pushnumber( L, ext.val.f64 );
                     return 1;

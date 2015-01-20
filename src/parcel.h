@@ -161,6 +161,8 @@ enum {
     PAR_K_I16,
     PAR_K_I32,
     PAR_K_I64,
+    // floating-point number
+    PAR_K_F32,
     PAR_K_F64
 };
 
@@ -199,6 +201,7 @@ enum {
     PAR_K_I16 |
     PAR_K_I32 |
     PAR_K_I64 |
+    PAR_K_F32 |
     PAR_K_F64 |
     ----------+------------------------------
 */
@@ -245,6 +248,7 @@ typedef par_typex_t par_type64_t;
 
 
 // to use unpack
+typedef float par_float32_t;
 typedef double par_float64_t;
 
 typedef struct {
@@ -260,6 +264,7 @@ typedef struct {
         uint_fast32_t u32;
         int_fast64_t i64;
         uint_fast64_t u64;
+        par_float32_t f32;
         par_float64_t f64;
     } val;
 } par_extract_t;
@@ -628,7 +633,13 @@ static inline int par_pack_int( par_pack_t *p, int_fast64_t num )
 }while(0)
 
 
-static inline int par_pack_float( par_pack_t *p, double num )
+static inline int par_pack_float32( par_pack_t *p, float num )
+{
+    _par_pack_bitfloat( p, 32, num, signbit( num ) );
+    return 0;
+}
+
+static inline int par_pack_float64( par_pack_t *p, double num )
 {
     _par_pack_bitfloat( p, 64, num, signbit( num ) );
     return 0;
@@ -784,6 +795,11 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
                 _par_check_blkspc( p->blksize, p->cur, PAR_TYPE64_SIZE );
                 _par_unpack_vint( ext, type, 64, p->endian );
                 p->cur += PAR_TYPE64_SIZE;
+            break;
+            case PAR_K_F32:
+                _par_check_blkspc( p->blksize, p->cur, PAR_TYPE32_SIZE );
+                _par_unpack_vfloat( ext, type, 32, p->endian );
+                p->cur += PAR_TYPE32_SIZE;
             break;
             case PAR_K_F64:
                 _par_check_blkspc( p->blksize, p->cur, PAR_TYPE64_SIZE );
