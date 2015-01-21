@@ -1203,11 +1203,17 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
         
         switch( ext->isa ){
             // 1 byte types
-            case PAR_ISA_NIL ... PAR_ISA_NAN:
+            case PAR_ISA_NIL:
+            case PAR_ISA_I0:
+            case PAR_ISA_NAN:
+            case PAR_ISA_EMP:
+            case PAR_ISA_EOS:
                 _PAR_VERIFY_ATTR( ext->attr, PAR_NOMASK );
                 p->cur += PAR_TYPE_SIZE;
             break;
-            case PAR_ISA_BOL ... PAR_ISA_EOS:
+            
+            case PAR_ISA_BOL:
+            case PAR_ISA_INF:
                 _PAR_VERIFY_ATTR( ext->attr, PAR_MASK_BOL );
                 p->cur += PAR_TYPE_SIZE;
             break;
@@ -1234,14 +1240,16 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
                 _PAR_UNPACK_BITFLOAT( p, type, ext, 64 );
             break;
             
-            case PAR_ISA_RAW ... PAR_ISA_STR:
+            case PAR_ISA_RAW:
+                _PAR_VERIFY_ATTR( ext->attr, PAR_MASK_BIT );
+            case PAR_ISA_STR:
                 _PAR_UNPACK_BYTEA( p, type, ext );
             break;
             
-            case PAR_ISA_ARR ... PAR_ISA_MAP:
+            case PAR_ISA_ARR:
+            case PAR_ISA_MAP:
                 if( ext->attr & PAR_A_STREAM ){
                     _PAR_VERIFY_ATTR( ext->attr, ~(PAR_MASK_BIT) );
-                    ext->len = 0;
                     p->cur += PAR_TYPE_SIZE;
                 }
                 else
