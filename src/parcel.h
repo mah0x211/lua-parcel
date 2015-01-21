@@ -395,7 +395,6 @@ typedef par_typex_t par_type64_t;
 
 
 
-// MARK: default memory block size
 // MARK: endianness
 
 // 0x0: little-endian, 0x4: big-endian
@@ -407,7 +406,24 @@ static inline uint8_t par_get_endian( void )
     return (uint8_t)(endian << 2);
 }
 
+
+// MARK: memory block size
+
 #define PAR_DEFAULT_BLK_SIZE    1024
+
+static inline size_t _par_align_blksize( size_t blksize )
+{
+    if( !blksize ){
+        return PAR_DEFAULT_BLK_SIZE;
+    }
+    else if( blksize < 16 ){
+        return 16;
+    }
+    
+    return blksize / 16 * 16;
+}
+
+#undef PAR_DEFAULT_BLK_SIZE
 
 
 // check available block space
@@ -421,7 +437,7 @@ static inline uint8_t par_get_endian( void )
 
 // MARK: packing
 
-// bin data
+// for stream
 typedef int (*par_reduce_t)( void *mem, size_t bytes, void *udata );
 
 typedef struct {
@@ -441,25 +457,9 @@ typedef struct {
 static inline int par_pack_init( par_pack_t *p, size_t blksize, 
                                  par_reduce_t reducer, void *udata )
 {
-    if( !blksize ){
-        blksize = PAR_DEFAULT_BLK_SIZE;
-    }
-    else
-    {
-        if( blksize < 16 ){
-            blksize = 16;
-        }
-        blksize = blksize / 16 * 16;
-    }
-    
-    if( ( p->mem = malloc( blksize ) ) )
-    {
-        static const int endian = 1;
-        
-        // 0x0: little-endian, 0x4: big-endian
-        p->endian = !(*(char*)&endian);
-        p->endian <<= 2;
-        
+    blksize = _par_align_blksize( blksize );
+    if( ( p->mem = malloc( blksize ) ) ){
+        p->endian = par_get_endian();
         p->cur = 0;
         p->blksize = blksize;
         p->nblkmax = SIZE_MAX / blksize;
