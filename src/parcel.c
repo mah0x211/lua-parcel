@@ -575,10 +575,14 @@ static int unpack_val( lua_State *L, par_unpack_t *p )
                 
                 // array
                 case PAR_ISA_ARR:
+                // stream array
+                case PAR_ISA_SAR:
                     lua_createtable( L, (int)ext.len, 0 );
                     return unpack_tbl( L, p, ext.len );
                 // map
                 case PAR_ISA_MAP:
+                // stream map
+                case PAR_ISA_SMP:
                     lua_createtable( L, 0, (int)ext.len );
                     return unpack_tbl( L, p, ext.len );
             }
