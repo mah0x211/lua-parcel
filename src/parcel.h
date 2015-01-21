@@ -684,14 +684,14 @@ static inline int par_spack_empty( par_spack_t *p )
 }
 
 // stream array
-static inline int par_spack_sar( par_spack_t *p )
+static inline int par_spack_sarray( par_spack_t *p )
 {
     return _PAR_PACK_TYPE( p, _par_pack_reduce, PAR_ISA_SAR, PAR_A_NONE, 
                            PAR_NOMASK );
 }
 
 // stream map
-static inline int par_spack_smp( par_spack_t *p )
+static inline int par_spack_smap( par_spack_t *p )
 {
     return _PAR_PACK_TYPE( p, _par_pack_reduce, PAR_ISA_SMP, PAR_A_NONE, 
                            PAR_NOMASK );
@@ -943,7 +943,7 @@ static inline int par_spack_str( par_spack_t *p, void *val, size_t len )
 
 
 // array/map
-static inline int par_pack_arr( par_pack_t *p, size_t len )
+static inline int par_pack_array( par_pack_t *p, size_t len )
 {
     _PAR_PACK_TYPE_WITH_LEN( p, _par_pack_increase, PAR_ISA_ARR|p->endian, len );
     return 0;
@@ -1045,7 +1045,7 @@ static inline int par_spack_ref( par_spack_t *p, size_t idx )
 }while(0)
 
 
-static inline int par_pack_arridx( par_pack_t *p, uint8_t bit, size_t *idx )
+static inline int par_pack_arrayidx( par_pack_t *p, uint8_t bit, size_t *idx )
 {
     _PAR_PACK_TYPEXIDX( p, PAR_ISA_ARR, bit, idx );
     return 0;
