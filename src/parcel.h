@@ -210,8 +210,7 @@ enum {
     // -----------------+----+
     // PAR_ISA_F64 01100|X0Y
     // -----------------+----+
-    //
-    // X: endianess
+    // X: 0 = PAR_A_LENDIAN, 1 = PAR_A_BENDIAN
     // Y: signedness
     // ---------------+---------------+
     //               X|Y
@@ -239,7 +238,7 @@ enum {
     PAR_ISA_F64 = 0x60, // 64 bit
 
     //
-    // 1+[0-8] byte types
+    // 1+[1-8] byte types
     //
     // -----------------+---+
     // type             |attr
@@ -248,8 +247,7 @@ enum {
     // -----------------+---+
     // PAR_ISA_MAP 01110|XYY
     // -----------------+---+
-    //
-    //  X: endianess
+    //  X: 0 = PAR_A_LENDIAN, 1 = PAR_A_BENDIAN
     // YY: length of array/map
     // --------------+---------------------
     // YY            | size bit
@@ -273,7 +271,7 @@ enum {
     PAR_ISA_MAP = 0x70, // map
 
     //
-    // 1+[0-8] byte types
+    // 1 byte types
     //
     // -----------------+---+
     // type             |attr
@@ -299,21 +297,21 @@ enum {
     // -----------------+----+
     // type             |attr
     // -----------------+----+
-    // PAR_ISA_REF 10001|0XX
+    // PAR_ISA_REF 10001|XYY
     // -----------------+----+
-    //
-    // XXX is cursor position of reference
-    // ---------------+----------------------
-    // XX             | size bit
-    // ---------------+----------------------
-    // 00 PAR_A_BIT8  |  8 bit uint (1 byte)
-    // ---------------+----------------------
-    // 01 PAR_A_BIT16 | 16 bit uint (2 byte)
-    // ---------------+----------------------
-    // 10 PAR_A_BIT32 | 32 bit uint (4 byte)
-    // ---------------+----------------------
-    // 11 PAR_A_BIT64 | 64 bit uint (8 byte)
-    // ---------------+----------------------
+    //  X: 0 = PAR_A_LENDIAN, 1 = PAR_A_BENDIAN
+    // YY: previous cursor position
+    // --------------+----------------------
+    // YY            | size bit
+    // --------------+----------------------
+    // PAR_A_BIT8  00|  8 bit uint (1 byte)
+    // --------------+----------------------
+    // PAR_A_BIT16 01| 16 bit uint (2 byte)
+    // --------------+----------------------
+    // PAR_A_BIT32 10| 32 bit uint (4 byte)
+    // --------------+----------------------
+    // PAR_A_BIT64 11| 64 bit uint (8 byte)
+    // --------------+----------------------
     //
     // reference
     // 0      1         ...      max 9(XX byte)
@@ -334,19 +332,18 @@ enum {
     // PAR_ISA_STR 10011|XYY
     // -----------------+----+
     // X: 0 = PAR_A_LENDIAN, 1 = PAR_A_BENDIAN
-    //
     // YY is size of raw/string, or cursor position of reference
+    // --------------+----------------------
+    //             YY| size bit
+    // --------------+----------------------
+    // PAR_A_BIT8  00|  8 bit uint (1 byte)
+    // --------------+----------------------
+    // PAR_A_BIT16 01| 16 bit uint (2 byte)
+    // --------------+----------------------
+    // PAR_A_BIT32 10| 32 bit uint (4 byte)
+    // --------------+----------------------
+    // PAR_A_BIT64 11| 64 bit uint (8 byte)
     // ---------------+----------------------
-    // YY             | size bit
-    // ---------------+----------------------
-    // 00 PAR_A_BIT8  |  8 bit uint (1 byte)
-    // ---------------+----------------------
-    // 01 PAR_A_BIT16 | 16 bit uint (2 byte)
-    // ---------------+----------------------
-    // 10 PAR_A_BIT32 | 32 bit uint (4 byte)
-    // ---------------+----------------------
-    // 11 PAR_A_BIT64 | 64 bit uint (8 byte)
-    // ----------------+----------------------
     //
     // raw/string
     // 0      1     ...   max 9(YY byte)
@@ -959,6 +956,73 @@ static inline int par_pack_map( par_pack_t *p, size_t len )
 }
 
 
+// reference
+static inline int par_pack_ref( par_pack_t *p, size_t idx )
+{
+    par_type_t *pval = NULL;
+    
+    // illegal byte sequence
+    if( idx >= p->cur ){
+        errno = PARCEL_EILSEQ;
+        return -1;
+    }
+    
+    pval = (par_type_t*)( p->mem + idx );
+    // verify type
+    switch( pval->isa & PAR_MASK_ISA ){
+        case PAR_ISA_NIL:
+        case PAR_ISA_I0:
+        case PAR_ISA_NAN:
+        case PAR_ISA_EMP:
+        case PAR_ISA_EOS:
+        case PAR_ISA_SAR:
+        case PAR_ISA_SMP:
+            _PAR_VERIFY_ATTR( pval->isa & PAR_MASK_ATTR, PAR_NOMASK );
+        break;
+        
+        case PAR_ISA_BOL:
+        case PAR_ISA_INF:
+            _PAR_VERIFY_ATTR( pval->isa & PAR_MASK_ATTR, PAR_MASK_BOL );
+        break;
+        
+        case PAR_ISA_I8:
+        case PAR_ISA_I16:
+        case PAR_ISA_I32:
+        case PAR_ISA_I64:
+        case PAR_ISA_F32:
+        case PAR_ISA_F64:
+            _PAR_VERIFY_ATTR( pval->isa & PAR_MASK_ATTR, PAR_MASK_NUM );
+        break;
+
+        case PAR_ISA_RAW:
+            _PAR_VERIFY_ATTR( pval->isa & PAR_MASK_ATTR, PAR_MASK_BIT );
+        break;
+        
+        case PAR_ISA_ARR:
+        case PAR_ISA_MAP:
+        case PAR_ISA_REF:
+        case PAR_ISA_STR:
+        break;
+    }
+    
+    _PAR_PACK_TYPE_WITH_LEN( p, _par_pack_increase, PAR_ISA_REF, idx );
+    
+    return 0;
+}
+
+
+static inline int par_spack_ref( par_spack_t *p, size_t idx )
+{
+    // illegal sequence: invalid position
+    if( idx > p->cur ){
+        errno = PARCEL_EILSEQ;
+        return -1;
+    }
+
+    _PAR_PACK_TYPE_WITH_LEN( p, _par_pack_reduce, PAR_ISA_REF, idx );
+    return 0;
+}
+
 // MARK: undef _PAR_PACK_TYPE_WITH_LEN
 #undef _PAR_PACK_TYPE_WITH_LEN
 // MARK: undef _PAR_PACK_TYPE_WITH_LEN_EX
@@ -1139,7 +1203,7 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 }while(0)
 
 
-#define _PAR_UNPACK_ARRMAP( p, type, ext ) do { \
+#define _PAR_UNPACK_TYPE_WITH_LEN( p, type, ext ) do { \
     uint_fast8_t _bit = (ext)->attr & PAR_MASK_BIT; \
     _PAR_CHECK_BLKSPC( (p)->blksize, (p)->cur, _PAR_BIT2BYTE( _bit ) ); \
     switch( _bit ){ \
@@ -1273,7 +1337,8 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
             
             case PAR_ISA_ARR:
             case PAR_ISA_MAP:
-                _PAR_UNPACK_ARRMAP( p, type, ext );
+            case PAR_ISA_REF:
+                _PAR_UNPACK_TYPE_WITH_LEN( p, type, ext );
             break;
             
             // illegal byte sequence
@@ -1302,8 +1367,8 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
 #undef _PAR_BSWAP64
 // MARK: undef _PAR_UNPACK_NBITLEN
 #undef _PAR_UNPACK_NBITLEN
-// MARK: undef _PAR_UNPACK_ARRMAP
-#undef _PAR_UNPACK_ARRMAP
+// MARK: undef _PAR_UNPACK_TYPE_WITH_LEN
+#undef _PAR_UNPACK_TYPE_WITH_LEN
 // MARK: undef _PAR_UNPACK_NBIT_BYTEA
 #undef _PAR_UNPACK_NBIT_BYTEA
 // MARK: undef _PAR_UNPACK_BYTEA
