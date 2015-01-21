@@ -665,21 +665,36 @@ static inline int par_pack_float64( par_pack_t *p, double num )
 
 
 // array/map
-static inline int _par_pack_typex( par_pack_t *p, uint8_t isa, uint8_t size,
-                                   size_t *idx )
+static inline int _par_pack_typex( par_pack_t *p, uint8_t isa, size_t len )
 {
     if( !p->reducer )
     {
         par_type_t *pval = NULL;
         
-        if( size & ~(PAR_MASK_BIT) ){
-            errno = PARCEL_EDOM;
-            return -1;
+        // 64bit
+        if( len & 0xFFFFFFFF00000000 ){
+            pval = _par_pack_slice( p, PAR_TYPE64_SIZE );
+            pval->isa = isa | PAR_A_BIT64;
+            *(uint_fast64_t*)(pval+PAR_TYPE_SIZE) = (uint_fast64_t)len;
         }
-        
-        *idx = p->cur;
-        pval = _par_pack_slice( p, PAR_TYPEX_SIZE );
-        pval->isa = isa | size;
+        // 32bit
+        else if( len & 0xFFFF0000 ){
+            pval = _par_pack_slice( p, PAR_TYPE32_SIZE );
+            pval->isa = isa | PAR_A_BIT32;
+            *(uint_fast32_t*)(pval+PAR_TYPE_SIZE) = (uint_fast32_t)len;
+        }
+        // 16bit
+        else if( len & 0xFF00 ){
+            pval = _par_pack_slice( p, PAR_TYPE16_SIZE );
+            pval->isa = isa | PAR_A_BIT16;
+            *(uint_fast16_t*)(pval+PAR_TYPE_SIZE) = (uint_fast16_t)len;
+        }
+        // 8bit
+        else {
+            pval = _par_pack_slice( p, PAR_TYPE8_SIZE );
+            pval->isa = isa | PAR_A_BIT8;
+            *(uint_fast8_t*)(pval+PAR_TYPE_SIZE) = (uint_fast8_t)len;
+        }
         
         return 0;
     }
@@ -687,8 +702,8 @@ static inline int _par_pack_typex( par_pack_t *p, uint8_t isa, uint8_t size,
     return _par_pack_type( p, isa, PAR_A_STREAM, PAR_A_STREAM );
 }
 
-#define par_pack_arr(p,idx)    _par_pack_typex(p,PAR_ISA_ARR,PAR_A_BIT64,idx)
-#define par_pack_map(p,idx)    _par_pack_typex(p,PAR_ISA_MAP,PAR_A_BIT64,idx)
+#define par_pack_arr(p,len)    _par_pack_typex(p,PAR_ISA_ARR,len)
+#define par_pack_map(p,len)    _par_pack_typex(p,PAR_ISA_MAP,len)
 
 
 static inline int par_pack_tbllen( par_pack_t *p, size_t idx, size_t len )
@@ -697,18 +712,16 @@ static inline int par_pack_tbllen( par_pack_t *p, size_t idx, size_t len )
     if( p->reducer ){
         return par_pack_eos( p );
     }
+    else if( idx > p->cur ){
+        errno = PARCEL_EDOM;
+        return -1;
+    }
     else
     {
-        par_type_t *pval = NULL;
-        par_typelen_t *plen = NULL;
+        par_type_t *pval = (par_type_t*)(p->mem + idx);
         
-        if( idx > p->cur || ( idx + PAR_TYPEX_SIZE ) > p->cur ){
-            errno = PARCEL_EDOM;
-            return -1;
-        }
-        
-        pval = (par_type_t*)(p->mem + idx);
-        switch( pval->isa & PAR_MASK_ISA ){
+        switch( pval->isa & PAR_MASK_ISA )
+        {
             case PAR_ISA_ARR:
             case PAR_ISA_MAP:
                 // operation not supported
@@ -716,9 +729,37 @@ static inline int par_pack_tbllen( par_pack_t *p, size_t idx, size_t len )
                     errno = PARCEL_ENOTSUP;
                     return -1;
                 }
-                plen = (par_typelen_t*)(pval+PAR_TYPE_SIZE);
-                *plen = len;
-                return 0;
+                else
+                {
+                    uint_fast8_t bit = pval->isa & PAR_MASK_BIT;
+                    
+                    if( ( idx + _par_bit2byte( bit ) ) > p->cur ){
+                        errno = PARCEL_EDOM;
+                        return -1;
+                    }
+                    
+#define _PAR_SET_BITLEN(t,bit,len) \
+    *(uint_fast##bit##_t*)(t+PAR_TYPE_SIZE) = (uint_fast##bit##_t)len;
+
+                    switch( bit ){
+                        case PAR_A_BIT8:
+                            _PAR_SET_BITLEN( pval, 8, len );
+                        break;
+                        case PAR_A_BIT16:
+                            _PAR_SET_BITLEN( pval, 16, len );
+                        break;
+                        case PAR_A_BIT32:
+                            _PAR_SET_BITLEN( pval, 32, len );
+                        break;
+                        case PAR_A_BIT64:
+                            _PAR_SET_BITLEN( pval, 64, len );
+                        break;
+                    }
+
+#undef _PAR_SET_BITLEN
+
+                    return 0;
+                }
         }
         
         // illegal byte sequence
@@ -727,7 +768,6 @@ static inline int par_pack_tbllen( par_pack_t *p, size_t idx, size_t len )
     
     return -1;
 }
-
 
 
 static inline int par_pack_str( par_pack_t *p, void *val, size_t len )
