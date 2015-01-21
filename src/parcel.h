@@ -420,8 +420,8 @@ static inline size_t _par_align_blksize( size_t blksize )
 
 
 // check available block space
-#define _PAR_CHECK_BLKSPC(blksize,cur,req) do { \
-    if( (cur) >= (blksize) || ((blksize)-(cur)) < (req) ){ \
+#define _PAR_CHECK_BLKSPC( blksize, cur, req ) do { \
+    if( (cur) >= (blksize) || ( (blksize) - (cur) ) < (req) ){ \
         errno = PARCEL_ENOBLKS; \
         return -1; \
     } \
@@ -491,7 +491,7 @@ static inline int par_spack_init( par_spack_t *p, size_t blksize,
 }
 
 
-#define par_pack_dispose(p) do { \
+#define par_pack_dispose( p ) do { \
     if( (p)->mem ){ \
         free( (p)->mem ); \
         (p)->mem = NULL; \
@@ -554,13 +554,13 @@ static void *_par_pack_reduce( par_spack_t *p, size_t bytes )
 
 // allocate sizeof(t) and extra bytes
 #define _PAR_PACK_SLICE( p, fn, l ) ({ \
-    void *mem = fn( p, l ); \
-    if( !mem ){ \
+    void *_mem = fn( p, l ); \
+    if( !_mem ){ \
         return -1; \
     } \
-    mem = (p)->mem + (p)->cur; \
+    _mem = (p)->mem + (p)->cur; \
     (p)->cur += l; \
-    mem; \
+    _mem; \
 })
 
 
@@ -700,15 +700,15 @@ static inline int par_spack_eos( par_spack_t *p )
 // MARK: packing integeral number
 
 #define _PAR_PACK_BITINT( p, allocf, bit, v, sign ) do { \
-    par_type_t *pval = _PAR_PACK_SLICE( p, allocf, PAR_TYPE##bit##_SIZE ); \
-    pval->isa = PAR_ISA_I##bit | p->endian | sign; \
-    *((uint_fast##bit##_t*)(pval+PAR_TYPE_SIZE)) = (uint_fast##bit##_t)v; \
+    par_type_t *_pval = _PAR_PACK_SLICE( p, allocf, PAR_TYPE##bit##_SIZE ); \
+    _pval->isa = PAR_ISA_I##bit | (p)->endian | (sign); \
+    *((uint_fast##bit##_t*)(_pval+PAR_TYPE_SIZE)) = (uint_fast##bit##_t)(v); \
 }while(0)
 
 
 // positive integer
 #define _PAR_PACK_UINT( p, allocf, num ) do { \
-    if( num <= UINT8_MAX ){ \
+    if( (num) <= UINT8_MAX ){ \
         _PAR_PACK_BITINT( p, allocf, 8, num, PAR_A_UNSIGN ); \
     } \
     else if( num <= UINT16_MAX ){ \
@@ -743,7 +743,7 @@ static inline int par_spack_uint( par_spack_t *p, uint_fast64_t num )
 
 // negative integer
 #define _PAR_PACK_INT( p, allocf, num ) do { \
-    if( num >= INT8_MIN ){ \
+    if( (num) >= INT8_MIN ){ \
         _PAR_PACK_BITINT( p, allocf, 8, num, PAR_A_SIGNED ); \
     } \
     else if( num >= INT16_MIN ){ \
@@ -781,10 +781,10 @@ static inline int par_spack_int( par_spack_t *p, int_fast64_t num )
 // MARK: packing floating-point number
 
 #define _PAR_PACK_BITFLOAT( p, allocf, bit, v ) do { \
-    uint_fast8_t sign = !!signbit( v ); \
-    par_type_t *pval = _PAR_PACK_SLICE( p, allocf, PAR_TYPE##bit##_SIZE ); \
-    pval->isa = PAR_ISA_F##bit | p->endian | (sign); \
-    *((par_float##bit##_t*)(pval+PAR_TYPE_SIZE)) = (par_float##bit##_t)(v); \
+    uint_fast8_t _sign = !!signbit( v ); \
+    par_type_t *_pval = _PAR_PACK_SLICE( p, allocf, PAR_TYPE##bit##_SIZE ); \
+    _pval->isa = PAR_ISA_F##bit | (p)->endian | _sign; \
+    *((par_float##bit##_t*)(_pval+PAR_TYPE_SIZE)) = (par_float##bit##_t)(v); \
 }while(0)
 
 static inline int par_pack_float32( par_pack_t *p, float num )
@@ -818,10 +818,10 @@ static inline int par_spack_float64( par_spack_t *p, double num )
 
 // MARK: packing type with length value
 #define _PAR_PACK_TYPE_WITH_NBITLEN( p, ptr, allocf, type, len, bit, ex ) do { \
-    par_type_t *pval = _PAR_PACK_SLICE( p, allocf, PAR_TYPE##bit##_SIZE + ex ); \
-    pval->isa = (type) | PAR_A_BIT##bit; \
-    *(uint_fast##bit##_t*)(pval+PAR_TYPE_SIZE) = (uint_fast##bit##_t)len; \
-    *(ptr) = (void*)(pval + PAR_TYPE##bit##_SIZE); \
+    par_type_t *_pval = _PAR_PACK_SLICE(p, allocf, PAR_TYPE##bit##_SIZE+(ex) );\
+    _pval->isa = (type) | PAR_A_BIT##bit; \
+    *(uint_fast##bit##_t*)(_pval+PAR_TYPE_SIZE) = (uint_fast##bit##_t)(len); \
+    *(ptr) = (void*)( _pval + PAR_TYPE##bit##_SIZE ); \
 }while(0)
 
 #define _PAR_PACK_TYPE_WITH_LEN_EX( p, ptr, allocf, type, len, ex ) do { \
@@ -854,11 +854,11 @@ static inline int par_spack_float64( par_spack_t *p, double num )
 // MARK: packing raw/string/ref
 
 #define _PAR_PACK_BYTEA( p, allocf, type, val, len ) do { \
-    void *dest = NULL; \
+    void *_dest = NULL; \
     /* allocate extra bytes space */ \
-    _PAR_PACK_TYPE_WITH_LEN_EX( p, &dest, allocf, type, len, len ); \
+    _PAR_PACK_TYPE_WITH_LEN_EX( p, &_dest, allocf, type, len, len ); \
     /* copy val */ \
-    memcpy( dest, val, len ); \
+    memcpy( _dest, val, len ); \
 }while(0)
 
 static inline int par_pack_raw( par_pack_t *p, void *val, size_t len )
@@ -878,33 +878,33 @@ static inline int par_pack_str( par_pack_t *p, void *val, size_t len )
 
 
 #define _PAR_SPACK_BYTEA( p, val, len ) do { \
-    size_t remain = p->blksize - p->cur; \
+    size_t _remain = (p)->blksize - (p)->cur; \
     /* copy to memory block if have space */ \
-    if( remain >= len ){ \
+    if( _remain >= len ){ \
 COPY2BLOCK: \
-        memcpy( p->mem + p->cur, val, len ); \
-        p->cur += len; \
+        memcpy( (p)->mem + (p)->cur, val, len ); \
+        (p)->cur += len; \
     } \
     else \
     { \
         /* copy remaining bytes */ \
-        if( remain ){ \
-            memcpy( p->mem + p->cur, val, remain ); \
-            p->cur += remain; \
-            val += remain; \
+        if( _remain ){ \
+            memcpy( (p)->mem + (p)->cur, val, _remain ); \
+            (p)->cur += _remain; \
+            val += _remain; \
         } \
         /* reduce memory */ \
-        if( p->reducer( p->mem, p->cur, p->udata ) == 0 ) \
+        if( (p)->reducer( (p)->mem, (p)->cur, (p)->udata ) == 0 ) \
         { \
             /* rewind cursor */ \
-            p->cur = 0; \
-            len -= remain; \
+            (p)->cur = 0; \
+            len -= _remain; \
             /* copy to memory block if have space */ \
-            if( len < p->blksize ){ \
+            if( len < (p)->blksize ){ \
                 goto COPY2BLOCK; \
             } \
             /* reduce all */ \
-            else if( p->reducer( val, len, p->udata ) != 0 ){ \
+            else if( (p)->reducer( val, len, (p)->udata ) != 0 ){ \
                 return -1; \
             } \
         } \
@@ -952,16 +952,17 @@ static inline int par_pack_map( par_pack_t *p, size_t len )
 #undef _PAR_PACK_TYPE_WITH_NBITLEN
 
 
+
 #define _PAR_PACK_TYPEXIDX( p, type, bit, idx ) do { \
-    par_type_t *pval = NULL; \
-    if( bit & ~(PAR_MASK_BIT) ){ \
+    par_type_t *_pval = NULL; \
+    if( (bit) & ~(PAR_MASK_BIT) ){ \
         errno = PARCEL_EDOM; \
         return -1; \
     } \
-    *idx = (p)->cur; \
-    pval = _PAR_PACK_SLICE( p, _par_pack_increase, \
-                            PAR_TYPE_SIZE + _PAR_BIT2BYTE( bit ) ); \
-    pval->isa = type | bit; \
+    *(idx) = (p)->cur; \
+    _pval = _PAR_PACK_SLICE( p, _par_pack_increase, \
+                             PAR_TYPE_SIZE + _PAR_BIT2BYTE( bit ) ); \
+    _pval->isa = (type) | (bit); \
 }while(0)
 
 
@@ -1094,8 +1095,8 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 
 
 // verify attribute
-#define _PAR_VERIFY_ATTR(attr,mask) do { \
-    if((attr) & ~(mask)){ \
+#define _PAR_VERIFY_ATTR( attr, mask ) do { \
+    if( (attr) & ~(mask) ){ \
         errno = PARCEL_EILSEQ; \
         return -1; \
     } \
@@ -1125,7 +1126,7 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 // extract nbit len value
 #define _PAR_UNPACK_NBITLEN( p, type, ext, bit ) do { \
     (ext)->len = *(uint_fast##bit##_t*)( (type) + PAR_TYPE_SIZE ); \
-    if( bit > 8 && (p)->endian != (ext)->endian ){ \
+    if( (bit) > 8 && (p)->endian != (ext)->endian ){ \
         _PAR_BSWAP##bit( (ext)->len ); \
     } \
     (p)->cur += PAR_TYPE##bit##_SIZE; \
@@ -1133,9 +1134,9 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 
 
 #define _PAR_UNPACK_ARRMAP( p, type, ext ) do { \
-    uint_fast8_t bit = (ext)->attr & PAR_MASK_BIT; \
-    _PAR_CHECK_BLKSPC( (p)->blksize, (p)->cur, _PAR_BIT2BYTE( bit ) ); \
-    switch( bit ){ \
+    uint_fast8_t _bit = (ext)->attr & PAR_MASK_BIT; \
+    _PAR_CHECK_BLKSPC( (p)->blksize, (p)->cur, _PAR_BIT2BYTE( _bit ) ); \
+    switch( _bit ){ \
         case PAR_A_BIT8: \
             _PAR_UNPACK_NBITLEN( p, type, ext, 8 ); \
         break; \
@@ -1163,9 +1164,9 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 
 
 #define _PAR_UNPACK_BYTEA( p, type, ext ) do { \
-    uint_fast8_t bit = (type)->isa & PAR_MASK_BIT; \
-    _PAR_CHECK_BLKSPC( (p)->blksize, (p)->cur, _PAR_BIT2BYTE( bit ) ); \
-    switch( bit ){ \
+    uint_fast8_t _bit = (type)->isa & PAR_MASK_BIT; \
+    _PAR_CHECK_BLKSPC( (p)->blksize, (p)->cur, _PAR_BIT2BYTE( _bit ) ); \
+    switch( _bit ){ \
         case PAR_A_BIT8: \
             _PAR_UNPACK_NBIT_BYTEA( p, type, ext, 8 ); \
         break; \
@@ -1187,7 +1188,7 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
     _PAR_CHECK_BLKSPC( (p)->blksize, (p)->cur, PAR_TYPE##bit##_SIZE ); \
     (ext)->val.u##bit = *(uint_fast##bit##_t*)( (type) + PAR_TYPE_SIZE ); \
     (p)->cur += PAR_TYPE##bit##_SIZE; \
-    if( bit > 8 && (p)->endian != (ext)->endian ){ \
+    if( (bit) > 8 && (p)->endian != (ext)->endian ){ \
         _PAR_BSWAP##bit( (ext)->val.u##bit ); \
     } \
 }while(0)
