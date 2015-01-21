@@ -1146,7 +1146,7 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 
 #define _PAR_UNPACK_BYTEA( p, type, ext ) do { \
     uint_fast8_t bit = (type)->isa & PAR_MASK_BIT; \
-    _PAR_CHECK_BLKSPC( p->blksize, p->cur, _PAR_BIT2BYTE( bit ) ); \
+    _PAR_CHECK_BLKSPC( (p)->blksize, (p)->cur, _PAR_BIT2BYTE( bit ) ); \
     switch( bit ){ \
         case PAR_A_BIT8: \
             _PAR_UNPACK_NBIT_BYTEA( p, type, ext, 8 ); \
@@ -1164,22 +1164,24 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 }while(0)
 
 
-#define _par_unpack_vint(p,ext,type,bit) do { \
-    _PAR_VERIFY_ATTR( ext->attr, PAR_MASK_NUM ); \
+#define _PAR_UNPACK_BITINT( p, type, ext, bit ) do { \
+    _PAR_VERIFY_ATTR( (ext)->attr, PAR_MASK_NUM ); \
     _PAR_CHECK_BLKSPC( (p)->blksize, (p)->cur, PAR_TYPE##bit##_SIZE ); \
-    ext->val.u##bit = *(uint_fast##bit##_t*)(type+PAR_TYPE_SIZE); \
-    if( bit > 8 && p->endian != ext->endian ){ \
-        _PAR_BSWAP##bit( ext->val.u##bit ); \
+    (ext)->val.u##bit = *(uint_fast##bit##_t*)( (type) + PAR_TYPE_SIZE ); \
+    (p)->cur += PAR_TYPE##bit##_SIZE; \
+    if( bit > 8 && (p)->endian != (ext)->endian ){ \
+        _PAR_BSWAP##bit( (ext)->val.u##bit ); \
     } \
 }while(0)
 
 
-#define _par_unpack_vfloat(p,ext,type,bit) do { \
-    _PAR_VERIFY_ATTR( ext->attr, PAR_MASK_NUM ); \
-    _PAR_CHECK_BLKSPC( p->blksize, p->cur, PAR_TYPE##bit##_SIZE ); \
-    ext->val.f##bit = *(par_float##bit##_t*)(type+PAR_TYPE_SIZE); \
-    if( p->endian != ext->endian ){ \
-        _PAR_BSWAP##bit( ext->val.u##bit ); \
+#define _PAR_UNPACK_BITFLOAT( p, type, ext, bit ) do { \
+    _PAR_VERIFY_ATTR( (ext)->attr, PAR_MASK_NUM ); \
+    _PAR_CHECK_BLKSPC( (p)->blksize, (p)->cur, PAR_TYPE##bit##_SIZE ); \
+    (ext)->val.f##bit = *(par_float##bit##_t*)( (type) + PAR_TYPE_SIZE ); \
+    (p)->cur += PAR_TYPE##bit##_SIZE; \
+    if( (p)->endian != (ext)->endian ){ \
+        _PAR_BSWAP##bit( (ext)->val.u##bit ); \
     } \
 }while(0)
 
@@ -1214,28 +1216,22 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
             // endian = 1:big-endian, 0:littel-endian
             // flag = 1:sign, 0:unsign
             case PAR_ISA_I8:
-                _par_unpack_vint( p, ext, type, 8 );
-                p->cur += PAR_TYPE8_SIZE;
+                _PAR_UNPACK_BITINT( p, type, ext, 8 );
             break;
             case PAR_ISA_I16:
-                _par_unpack_vint( p, ext, type, 16 );
-                p->cur += PAR_TYPE16_SIZE;
+                _PAR_UNPACK_BITINT( p, type, ext, 16 );
             break;
             case PAR_ISA_I32:
-                _par_unpack_vint( p, ext, type, 32 );
-                p->cur += PAR_TYPE32_SIZE;
+                _PAR_UNPACK_BITINT( p, type, ext, 32 );
             break;
             case PAR_ISA_I64:
-                _par_unpack_vint( p, ext, type, 64 );
-                p->cur += PAR_TYPE64_SIZE;
+                _PAR_UNPACK_BITINT( p, type, ext, 64 );
             break;
             case PAR_ISA_F32:
-                _par_unpack_vfloat( p, ext, type, 32 );
-                p->cur += PAR_TYPE32_SIZE;
+                _PAR_UNPACK_BITFLOAT( p, type, ext, 32 );
             break;
             case PAR_ISA_F64:
-                _par_unpack_vfloat( p, ext, type, 64 );
-                p->cur += PAR_TYPE64_SIZE;
+                _PAR_UNPACK_BITFLOAT( p, type, ext, 64 );
             break;
             
             case PAR_ISA_RAW ... PAR_ISA_STR:
@@ -1244,7 +1240,7 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
             
             case PAR_ISA_ARR ... PAR_ISA_MAP:
                 if( ext->attr & PAR_A_STREAM ){
-                    _PAR_VERIFY_ATTR( ext->attr, ~PAR_MASK_BIT );
+                    _PAR_VERIFY_ATTR( ext->attr, ~(PAR_MASK_BIT) );
                     ext->len = 0;
                     p->cur += PAR_TYPE_SIZE;
                 }
