@@ -48,6 +48,7 @@
     luaL_unref( L, LUA_REGISTRYINDEX, ref )
 
 
+
 static int pack_val( par_pack_t *b, lua_State *L, int idx );
 
 static int pack_tbl( par_pack_t *b, lua_State *L, int idx, int ktype, 
@@ -170,6 +171,170 @@ static int pack_val( par_pack_t *p, lua_State *L, int idx )
 }
 
 
+static int pack_lua( lua_State *L )
+{
+    if( lua_gettop( L ) )
+    {
+        // memory block size
+        lua_Integer blksize = luaL_optinteger( L, 2, 0 );
+        int rv = 0;
+        par_pack_t p;
+        
+        // check blksize
+        if( blksize < 0 ){
+            blksize = 0;
+        }
+        // remove arguments wo first argument
+        lua_settop( L, 1 );
+        
+        if( ( rv = par_pack_init( &p, (size_t)blksize ) ) == 0 )
+        {
+            // pack value
+            if( ( rv = pack_val( &p, L, 1 ) ) == 0 ){
+                lua_settop( L, 0 );
+                lua_pushlstring( L, p.mem, p.cur );
+            }
+            par_pack_dispose( &p );
+        }
+        
+        // got error
+        if( rv != 0 ){
+            lua_settop( L, 0 );
+            lua_pushnil( L );
+            lua_pushstring( L, strerror( errno ) );
+            return 2;
+        }
+        
+    }
+    // no argument
+    else {
+        lua_pushnil( L );
+    }
+    
+    return 1;
+}
+
+
+
+
+// stream
+
+
+static int spack_val( par_spack_t *b, lua_State *L, int idx );
+
+static int spack_tbl( par_spack_t *p, lua_State *L, int idx, int ktype )
+{
+    // key: -2, val: -1
+    do
+    {
+        // unsupported key
+        if( lua_type( L, -2 ) != ktype ){
+            errno = ENOTSUP;
+            return -1;
+        }
+        // append key-val pair
+        else if( spack_val( p, L, -2 ) != 0 ||
+                 spack_val( p, L, -1 ) != 0 ){
+            return -1;
+        }
+        lua_pop( L, 1 );
+    } while( lua_next( L, -2 ) );
+    
+    return par_spack_eos( p );
+}
+
+
+static int spack_val( par_spack_t *p, lua_State *L, int idx )
+{
+    const char *str = NULL;
+    double num = 0;
+    double inum = 0;
+    size_t len = 0;
+    int ktype = 0;
+    
+    switch( lua_type( L, idx ) )
+    {
+        case LUA_TBOOLEAN:
+            return par_spack_bool( p, (uint8_t)lua_toboolean( L, idx ) );
+        
+        case LUA_TNUMBER:
+            num = lua_tonumber( L, idx );
+            // set nan
+            if( isnan( num ) ){
+                return par_spack_nan( p );
+            }
+            // set inf
+            else if( isinf( num ) ){
+                return par_spack_inf( p, signbit( num ) );
+            }
+            // set zero
+            else if( !num ){
+                return par_spack_zero( p );
+            }
+            // set integer
+            else if( modf( num, (double*)&inum ) == 0.0 )
+            {
+                // signed
+                if( signbit( inum ) ){
+                    return par_spack_int( p, (int_fast64_t)num );
+                }
+                // unsigned
+                return par_spack_uint( p, (uint_fast64_t)num );
+            }
+            // set float
+            // lua_Number == double
+            return par_spack_float64( p, num );
+        
+        case LUA_TSTRING:
+            str = lua_tolstring( L, idx, &len );
+            return par_spack_str( p, (void*)str, len );
+        
+        case LUA_TNIL:
+            return par_spack_nil( p );
+        
+        case LUA_TTABLE:
+            break;
+        
+        //case LUA_TLIGHTUSERDATA:
+        //case LUA_TFUNCTION:
+        //case LUA_TUSERDATA:
+        //case LUA_TTHREAD:
+        //case LUA_TNONE:
+        default:
+            return par_spack_nil( p );
+        
+    }
+    
+    // push space
+    lua_pushnil( L );
+    // empty table
+    if( !lua_next( L, -2 ) ){
+        return par_spack_empty( p );
+    }
+    
+    // check types
+    ktype = lua_type( L, -2 );
+    switch( ktype ){
+        case LUA_TNUMBER:
+            if( par_spack_arr( p ) != 0 ){
+                return -1;
+            }
+        break;
+        case LUA_TSTRING:
+            if( par_spack_map( p ) != 0 ){
+                return -1;
+            }
+        break;
+        
+        // unsupported key
+        default:
+            errno = ENOTSUP;
+            return -1;
+    }
+    
+    return spack_tbl( p, L, idx, ktype );
+}
+
 
 typedef struct {
     lua_State *L;
@@ -177,11 +342,12 @@ typedef struct {
     const char *errstr;
     int ref_co;
     int ref_fn;
-} packreduce_t;
+} spack_reduce_t;
 
-static int pack_reduce( void *mem, size_t bytes, void *udata )
+
+static int coreduce_lua( void *mem, size_t bytes, void *udata )
 {
-    packreduce_t *pr = (packreduce_t*)udata;
+    spack_reduce_t *pr = (spack_reduce_t*)udata;
     int rc = 0;
     
     lstate_pushref( pr->co, pr->ref_fn );
@@ -212,100 +378,74 @@ static int pack_reduce( void *mem, size_t bytes, void *udata )
 }
 
 
-static int pack_lua( lua_State *L )
+static int pack_reduce_lua( lua_State *L )
 {
-    int argc = lua_gettop( L );
-    par_pack_t p;
-    size_t blksize = 0;
-    packreduce_t pr = {
-        .L = L,
-        .co = NULL,
-        .errstr = NULL,
-        .ref_co = LUA_NOREF,
-        .ref_fn = LUA_NOREF
-    };
-    par_reduce_t reducer = NULL;
-    void *udata = NULL;
-    int rv = 0;
-    
-    // no arguments
-    if( argc == 0 ){
-        lua_pushnil( L );
-        return 1;
-    }
-    // resize argument length
-    else if( argc > 3 ){
-        argc = 3;
-        lua_settop( L, 3 );
-    }
-    // read arguments
-    switch( argc )
+    if( lua_gettop( L ) )
     {
-        // reduce function
-        case 3:
-            if( !lua_isnoneornil( L, 3 ) )
-            {
-                luaL_checktype( L, 3, LUA_TFUNCTION );
-                // nomem error
-                if( !( pr.co = lua_newthread( L ) ) ){
-                    lua_pushnil( L );
-                    lua_pushstring( L, strerror( errno ) );
-                    return 2;
-                }
-                // retain references
-                pr.ref_co = lstate_ref( L );
-                pr.ref_fn = lstate_ref( L );
-                reducer = pack_reduce;
-                udata = (void*)&pr;
-            }
         // memory block size
-        case 2:
-            if( !lua_isnoneornil( L, 2 ) )
-            {
-                lua_Integer val = luaL_checkinteger( L, 2 );
-                if( val > 0 ){
-                    blksize = (size_t)val;
-                }
-            }
-            // set one to number of argument
-            lua_settop( L, 1 );
-        break;
-    }
-    
-    // init par_pack_t
-    if( ( rv = par_pack_init( &p, blksize, reducer, udata ) ) == 0 )
-    {
-        // pack value
-        if( ( rv = pack_val( &p, L, 1 ) ) == 0 )
+        lua_Integer blksize = luaL_optinteger( L, 3, 0 );
+        par_spack_t p;
+        spack_reduce_t pr = {
+            .L = L,
+            .co = NULL,
+            .errstr = NULL,
+            .ref_co = LUA_NOREF,
+            .ref_fn = LUA_NOREF
+        };
+        par_reduce_t reducer = NULL;
+        void *udata = NULL;
+        int rv = 0;
+        
+        // check blksize
+        if( blksize < 0 ){
+            blksize = 0;
+        }
+        // check reduce function
+        luaL_checktype( L, 2, LUA_TFUNCTION );
+        
+        // nomem error
+        if( !( pr.co = lua_newthread( L ) ) ){
+            lua_pushnil( L );
+            lua_pushstring( L, strerror( errno ) );
+            return 2;
+        }
+        // retain references
+        pr.ref_co = lstate_ref( L );
+        pr.ref_fn = lstate_ref( L );
+        reducer = coreduce_lua;
+        udata = (void*)&pr;
+        // set one to number of argument
+        lua_settop( L, 1 );
+        // init par_pack_t
+        if( ( rv = par_spack_init( &p, (size_t)blksize, reducer, udata ) ) == 0 )
         {
-            lua_settop( L, 0 );
-            if( reducer )
+            // pack value
+            if( ( rv = spack_val( &p, L, 1 ) ) == 0 )
             {
-                if( ( rv = pack_reduce( p.mem, p.cur, udata ) ) == 0 ){
+                lua_settop( L, 0 );
+                if( ( rv = coreduce_lua( p.mem, p.cur, udata ) ) == 0 ){
                     lua_pushboolean( L, 1 );
                 }
             }
-            else {
-                lua_pushlstring( L, p.mem, p.cur );
-            }
+            par_pack_dispose( &p );
         }
-        par_pack_dispose( &p );
+        // release co ref
+        lstate_unref( L, pr.ref_co );
+        lstate_unref( L, pr.ref_fn );
+        // got error
+        if( rv != 0 ){
+            lua_settop( L, 0 );
+            lua_pushboolean( L, 0 );
+            lua_pushstring( L, strerror( errno ) );
+            return 2;
+        }
     }
-    
-    // release co ref
-    lstate_unref( L, pr.ref_co );
-    lstate_unref( L, pr.ref_fn );
-    // got error
-    if( rv != 0 ){
-        lua_settop( L, 0 );
-        lua_pushnil( L );
-        lua_pushstring( L, strerror( errno ) );
-        return 2;
+    else {
+        lua_pushboolean( L, 0 );
     }
     
     return 1;
 }
-
 
 
 static int unpack_val( lua_State *L, par_unpack_t *p );
@@ -473,6 +613,7 @@ LUALIB_API int luaopen_parcel( lua_State *L )
 {
     struct luaL_Reg method[] = {
         { "pack", pack_lua },
+        { "packReduce", pack_reduce_lua },
         { "unpack", unpack_lua },
         { NULL, NULL }
     };
