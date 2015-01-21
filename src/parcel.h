@@ -1252,7 +1252,7 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
             case PAR_ISA_ARR:
             case PAR_ISA_MAP:
                 if( ext->attr & PAR_A_STREAM ){
-                    _PAR_VERIFY_ATTR( ext->attr, ~(PAR_MASK_BIT) );
+                    _PAR_VERIFY_ATTR( ext->attr, PAR_A_STREAM );
                     p->cur += PAR_TYPE_SIZE;
                 }
                 else
