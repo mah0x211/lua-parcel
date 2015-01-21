@@ -396,6 +396,17 @@ typedef par_typex_t par_type64_t;
 
 
 // MARK: default memory block size
+// MARK: endianness
+
+// 0x0: little-endian, 0x4: big-endian
+static inline uint8_t par_get_endian( void )
+{
+    int endian = 1;
+    
+    endian = !(*(char*)&endian);
+    return (uint8_t)(endian << 2);
+}
+
 #define PAR_DEFAULT_BLK_SIZE    1024
 
 
