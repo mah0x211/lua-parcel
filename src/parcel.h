@@ -411,7 +411,7 @@ typedef par_typex_t par_type64_t;
 // MARK: packing
 
 // bin data
-typedef int (*par_packreduce_t)( void *mem, size_t bytes, void *udata );
+typedef int (*par_reduce_t)( void *mem, size_t bytes, void *udata );
 
 typedef struct {
     uint8_t endian;
@@ -422,13 +422,13 @@ typedef struct {
     size_t bytes;
     void *mem;
     // stream
-    par_packreduce_t reducer;
+    par_reduce_t reducer;
     void *udata;
 } par_pack_t;
 
 
 static inline int par_pack_init( par_pack_t *p, size_t blksize, 
-                                 par_packreduce_t reducer, void *udata )
+                                 par_reduce_t reducer, void *udata )
 {
     if( !blksize ){
         blksize = PAR_DEFAULT_BLK_SIZE;

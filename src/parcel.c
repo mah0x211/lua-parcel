@@ -224,7 +224,7 @@ static int pack_lua( lua_State *L )
         .ref_co = LUA_NOREF,
         .ref_fn = LUA_NOREF
     };
-    par_packreduce_t reducer = NULL;
+    par_reduce_t reducer = NULL;
     void *udata = NULL;
     int rv = 0;
     
