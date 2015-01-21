@@ -972,27 +972,33 @@ static inline int par_pack_map( par_pack_t *p, size_t len )
 #undef _PAR_PACK_TYPE_WITH_NBITLEN
 
 
-static inline int _par_pack_typexidx( par_pack_t *p, uint8_t isa, uint8_t bit,
-                                      size_t *idx )
-{
-    par_type_t *pval = NULL;
-    
-    if( bit & ~(PAR_MASK_BIT) ){
-        errno = PARCEL_EDOM;
-        return -1;
-    }
-    
-    *idx = p->cur;
-    pval = _PAR_PACK_SLICE( p, _par_pack_increase, 
-                            PAR_TYPE_SIZE + _PAR_BIT2BYTE( bit ) );
-    pval->isa = isa | bit;
+#define _PAR_PACK_TYPEXIDX( p, type, bit, idx ) do { \
+    par_type_t *pval = NULL; \
+    if( bit & ~(PAR_MASK_BIT) ){ \
+        errno = PARCEL_EDOM; \
+        return -1; \
+    } \
+    *idx = (p)->cur; \
+    pval = _PAR_PACK_SLICE( p, _par_pack_increase, \
+                            PAR_TYPE_SIZE + _PAR_BIT2BYTE( bit ) ); \
+    pval->isa = type | bit; \
+}while(0)
 
+
+static inline int par_pack_arridx( par_pack_t *p, uint8_t bit, size_t *idx )
+{
+    _PAR_PACK_TYPEXIDX( p, PAR_ISA_ARR, bit, idx );
     return 0;
 }
 
-#define par_pack_arridx(p,bit,idx) _par_pack_typexidx(p,PAR_ISA_ARR,bit,idx)
-#define par_pack_mapidx(p,bit,idx) _par_pack_typexidx(p,PAR_ISA_MAP,bit,idx)
+static inline int par_pack_mapidx( par_pack_t *p, uint8_t bit, size_t *idx )
+{
+    _PAR_PACK_TYPEXIDX( p, PAR_ISA_MAP, bit, idx );
+    return 0;
+}
 
+// MARK: undef _PAR_PACK_TYPEXIDX
+#undef _PAR_PACK_TYPEXIDX
 // MARK: undef _PAR_PACK_SLICE
 #undef _PAR_PACK_SLICE
 
