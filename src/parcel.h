@@ -879,6 +879,11 @@ static inline int par_spack_float64( par_spack_t *p, double num )
     memcpy( dest, val, len ); \
 }while(0)
 
+static inline int par_pack_raw( par_pack_t *p, void *val, size_t len )
+{
+    _PAR_PACK_BYTEA( p, _par_pack_increase, PAR_ISA_RAW, val, len );
+    return 0;
+}
 
 static inline int par_pack_str( par_pack_t *p, void *val, size_t len )
 {
@@ -925,6 +930,13 @@ COPY2BLOCK: \
 }while(0)
 
 
+static inline int par_spack_raw( par_spack_t *p, void *val, size_t len )
+{
+    _PAR_PACK_TYPE_WITH_LEN( p, _par_pack_reduce, PAR_ISA_RAW, len );
+    _PAR_SPACK_BYTEA( p, val, len );
+    return 0;
+}
+
 static inline int par_spack_str( par_spack_t *p, void *val, size_t len )
 {
     _PAR_PACK_TYPE_WITH_LEN( p, _par_pack_reduce, PAR_ISA_STR|p->endian, len );
@@ -945,6 +957,7 @@ static inline int _par_pack_typex( par_pack_t *p, uint8_t isa, size_t len )
 
 #define par_pack_arr(p,len)    _par_pack_typex(p,PAR_ISA_ARR,len)
 #define par_pack_map(p,len)    _par_pack_typex(p,PAR_ISA_MAP,len)
+
 
 // MARK: undef _PAR_PACK_TYPE_WITH_LEN
 #undef _PAR_PACK_TYPE_WITH_LEN
