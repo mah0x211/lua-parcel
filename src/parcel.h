@@ -951,14 +951,17 @@ static inline int par_spack_str( par_spack_t *p, void *val, size_t len )
 
 
 // array/map
-static inline int _par_pack_typex( par_pack_t *p, uint8_t isa, size_t len )
+static inline int par_pack_arr( par_pack_t *p, size_t len )
 {
-    _PAR_PACK_TYPE_WITH_LEN( p, _par_pack_increase, isa, len );
+    _PAR_PACK_TYPE_WITH_LEN( p, _par_pack_increase, PAR_ISA_ARR, len );
     return 0;
 }
 
-#define par_pack_arr(p,len)    _par_pack_typex(p,PAR_ISA_ARR,len)
-#define par_pack_map(p,len)    _par_pack_typex(p,PAR_ISA_MAP,len)
+static inline int par_pack_map( par_pack_t *p, size_t len )
+{
+    _PAR_PACK_TYPE_WITH_LEN( p, _par_pack_increase, PAR_ISA_MAP, len );
+    return 0;
+}
 
 
 // MARK: undef _PAR_PACK_TYPE_WITH_LEN
