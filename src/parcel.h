@@ -323,7 +323,7 @@ enum {
     // -----------------+----+
     // type             |attr
     // -----------------+----+
-    // PAR_ISA_RAW 10000|0YY
+    // PAR_ISA_RAW 10000|XYY
     // -----------------+----+
     // PAR_ISA_STR 10001|XYY
     // -----------------+----+
@@ -883,7 +883,7 @@ static inline int par_spack_float64( par_spack_t *p, double num )
 
 static inline int par_pack_raw( par_pack_t *p, void *val, size_t len )
 {
-    _PAR_PACK_BYTEA( p, _par_pack_increase, PAR_ISA_RAW, val, len );
+    _PAR_PACK_BYTEA( p, _par_pack_increase, PAR_ISA_RAW|p->endian, val, len );
     return 0;
 }
 
@@ -1140,6 +1140,9 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 #define _PAR_UNPACK_NBIT_BYTEA( p, type, ext, bit ) do { \
     (ext)->len = *(uint_fast##bit##_t*)( (type) + PAR_TYPE_SIZE ); \
     (ext)->val.str = (char*)( (type) + PAR_TYPE##bit##_SIZE ); \
+    if( bit > 8 && (p)->endian != (ext)->endian ){ \
+        _PAR_BSWAP##bit( (ext)->len ); \
+    } \
     (p)->cur += PAR_TYPE##bit##_SIZE + (ext)->len; \
 }while(0)
 
