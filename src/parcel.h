@@ -111,9 +111,6 @@ static inline char *par_strerror( par_error_t err )
 // convert bit value to byte size
 #define _PAR_BIT2BYTE(f)    (1<<(f))
 
-// array/map stream
-#define PAR_A_STREAM    0x4
-
 // endianness
 #define PAR_A_LENDIAN   PAR_A_NONE
 #define PAR_A_BENDIAN   0x1
@@ -134,6 +131,14 @@ static inline char *par_strerror( par_error_t err )
 #define PAR_MASK_INF    0x1
 #define PAR_MASK_BOL    0x1
 #define PAR_MASK_STR    PAR_MASK_ATTR
+
+// verify attribute
+#define _PAR_VERIFY_ATTR( attr, mask ) do { \
+    if( (attr) & ~(mask) ){ \
+        errno = PARCEL_EILSEQ; \
+        return -1; \
+    } \
+}while(0)
 
 
 // type(5): 0-31
@@ -244,30 +249,40 @@ enum {
     // PAR_ISA_MAP 01110|XYY
     // -----------------+---+
     //
-    // XYY is length of array/map
-    // -+---------------+---------------------
-    // X|YY             | size bit
-    // -+---------------+---------------------
-    // 0|00 PAR_A_BIT8  |  8 bit uint (1 byte)
-    // -+---------------+---------------------
-    // 0|01 PAR_A_BIT16 | 16 bit uint (2 byte)
-    // -+---------------+---------------------
-    // 0|10 PAR_A_BIT32 | 32 bit uint (4 byte)
-    // -+---------------+---------------------
-    // 0|11 PAR_A_BIT64 | 64 bit uint (8 byte)
-    // -+---------------+---------------------
-    // 1|00             | stream array/map
-    // -+---------------+---------------------
-    // 1|ZZ             | INVALID
-    // -+---------------+---------------------
-    // NOTE:
-    //   if arrat/map stream; last item must be PAR_ISA_EOS type.
+    //  X: endianess
+    // YY: length of array/map
+    // --------------+---------------------
+    // YY            | size bit
+    // --------------+---------------------
+    // PAR_A_BIT8  00|  8 bit uint (1 byte)
+    // --------------+---------------------
+    // PAR_A_BIT16 01| 16 bit uint (2 byte)
+    // --------------+---------------------
+    // PAR_A_BIT32 10| 32 bit uint (4 byte)
+    // --------------+---------------------
+    // PAR_A_BIT64 11| 64 bit uint (8 byte)
+    // --------------+---------------------
     //
-    // fixed length array/map
+    // array/map
     // 0      1   ...  max 9(YY byte)
     // -------+------------+---------------------
     // type(1)| length(YY) | serialized items...
     // -------+------------+---------------------
+    //
+    PAR_ISA_ARR = 0x68, // array
+    PAR_ISA_MAP = 0x70, // map
+
+    //
+    // 1+[0-8] byte types
+    //
+    // -----------------+---+
+    // type             |attr
+    // -----------------+---+
+    // PAR_ISA_SAR 01111|000
+    // -----------------+---+
+    // PAR_ISA_SMP 10000|000
+    // -----------------+---+
+    // NOTE: last item must be PAR_ISA_EOS type.
     //
     // stream array/map
     // 0      1
@@ -275,8 +290,8 @@ enum {
     // type(1)| serialized items... | PAR_ISA_EOS(1)
     // -------+---------------------+---------------+
     //
-    PAR_ISA_ARR = 0x68, // array
-    PAR_ISA_MAP = 0x70, // map  
+    PAR_ISA_SAR = 0x78, // stream array
+    PAR_ISA_SMP = 0x80, // stream map
 
     //
     // 1+[1-8] byte types
@@ -284,7 +299,7 @@ enum {
     // -----------------+----+
     // type             |attr
     // -----------------+----+
-    // PAR_ISA_REF 01111|0XX
+    // PAR_ISA_REF 10001|0XX
     // -----------------+----+
     //
     // XXX is cursor position of reference
@@ -306,7 +321,7 @@ enum {
     // type(1)| previous position(XX)
     // -------+----------------------+
     //
-    PAR_ISA_REF = 0x78, // reference
+    PAR_ISA_REF = 0x88, // reference
 
     //
     // 1+[1-8] byte types
@@ -314,9 +329,9 @@ enum {
     // -----------------+----+
     // type             |attr
     // -----------------+----+
-    // PAR_ISA_RAW 10000|XYY
+    // PAR_ISA_RAW 10010|XYY
     // -----------------+----+
-    // PAR_ISA_STR 10001|XYY
+    // PAR_ISA_STR 10011|XYY
     // -----------------+----+
     // X: 0 = PAR_A_LENDIAN, 1 = PAR_A_BENDIAN
     //
@@ -339,8 +354,8 @@ enum {
     // type(1)| data size(YY) | data(uint YY bit length)...
     // -------+---------------+-----------------------------
     //
-    PAR_ISA_RAW = 0x80, // raw data
-    PAR_ISA_STR = 0x88  // string
+    PAR_ISA_RAW = 0x90, // raw data
+    PAR_ISA_STR = 0x98  // string
 };
 
 
@@ -671,18 +686,18 @@ static inline int par_spack_empty( par_spack_t *p )
                            PAR_NOMASK );
 }
 
-// array
+// stream array
 static inline int par_spack_arr( par_spack_t *p )
 {
-    return _PAR_PACK_TYPE( p, _par_pack_reduce, PAR_ISA_ARR, PAR_A_STREAM, 
-                           PAR_A_STREAM );
+    return _PAR_PACK_TYPE( p, _par_pack_reduce, PAR_ISA_SAR, PAR_A_NONE, 
+                           PAR_NOMASK );
 }
 
-// map
+// stream map
 static inline int par_spack_map( par_spack_t *p )
 {
-    return _PAR_PACK_TYPE( p, _par_pack_reduce, PAR_ISA_MAP, PAR_A_STREAM, 
-                           PAR_A_STREAM );
+    return _PAR_PACK_TYPE( p, _par_pack_reduce, PAR_ISA_SMP, PAR_A_NONE, 
+                           PAR_NOMASK );
 }
 
 // eos
@@ -933,13 +948,13 @@ static inline int par_spack_str( par_spack_t *p, void *val, size_t len )
 // array/map
 static inline int par_pack_arr( par_pack_t *p, size_t len )
 {
-    _PAR_PACK_TYPE_WITH_LEN( p, _par_pack_increase, PAR_ISA_ARR, len );
+    _PAR_PACK_TYPE_WITH_LEN( p, _par_pack_increase, PAR_ISA_ARR|p->endian, len );
     return 0;
 }
 
 static inline int par_pack_map( par_pack_t *p, size_t len )
 {
-    _PAR_PACK_TYPE_WITH_LEN( p, _par_pack_increase, PAR_ISA_MAP, len );
+    _PAR_PACK_TYPE_WITH_LEN( p, _par_pack_increase, PAR_ISA_MAP|p->endian, len );
     return 0;
 }
 
@@ -1094,15 +1109,6 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 }
 
 
-// verify attribute
-#define _PAR_VERIFY_ATTR( attr, mask ) do { \
-    if( (attr) & ~(mask) ){ \
-        errno = PARCEL_EILSEQ; \
-        return -1; \
-    } \
-}while(0)
-
-
 // swap byteorder
 #define _PAR_BSWAP8(v)
 
@@ -1225,6 +1231,8 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
             case PAR_ISA_NAN:
             case PAR_ISA_EMP:
             case PAR_ISA_EOS:
+            case PAR_ISA_SAR:
+            case PAR_ISA_SMP:
                 _PAR_VERIFY_ATTR( ext->attr, PAR_NOMASK );
                 p->cur += PAR_TYPE_SIZE;
             break;
@@ -1265,13 +1273,7 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
             
             case PAR_ISA_ARR:
             case PAR_ISA_MAP:
-                if( ext->attr & PAR_A_STREAM ){
-                    _PAR_VERIFY_ATTR( ext->attr, PAR_A_STREAM );
-                    p->cur += PAR_TYPE_SIZE;
-                }
-                else {
-                    _PAR_UNPACK_ARRMAP( p, type, ext );
-                }
+                _PAR_UNPACK_ARRMAP( p, type, ext );
             break;
             
             // illegal byte sequence
