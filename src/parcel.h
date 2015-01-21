@@ -135,12 +135,14 @@ static inline char *par_strerror( par_error_t err )
 #define PAR_MASK_STR    PAR_MASK_ATTR
 
 
-#define _par_verify_attr(attr,mask) do { \
+// verify attribute
+#define _PAR_VERIFY_ATTR(attr,mask) do { \
     if((attr) & ~(mask)){ \
         errno = PARCEL_EILSEQ; \
         return -1; \
     } \
 }while(0)
+
 
 
 // type(5): 0-31
@@ -1123,10 +1125,11 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 }while(0)
 
 
+
 // len: *(uint_fast[8-64]_t*)(mem + cur + PAR_TYPE_SIZE)
 // val: mem + cur + PAR_TYPE[8-64]_SIZE
 #define _par_unpack_vstr( p, ext, type, bit ) do { \
-    _par_verify_attr( ext->attr, PAR_MASK_STR ); \
+    _PAR_VERIFY_ATTR( ext->attr, PAR_MASK_STR ); \
     ext->len = *(uint_fast##bit##_t*)( type + PAR_TYPE_SIZE ); \
     ext->val.str = (char*)(type+PAR_TYPE##bit##_SIZE); \
     if( bit > 8 && p->endian != ext->endian ){ \
@@ -1137,7 +1140,7 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 
 #define _par_unpack_vint(p,ext,type,bit) do { \
     _par_check_blkspc( p->blksize, p->cur, PAR_TYPE##bit##_SIZE ); \
-    _par_verify_attr( ext->attr, PAR_MASK_NUM ); \
+    _PAR_VERIFY_ATTR( ext->attr, PAR_MASK_NUM ); \
     ext->val.u##bit = *(uint_fast##bit##_t*)(type+PAR_TYPE_SIZE); \
     if( bit > 8 && p->endian != ext->endian ){ \
         _PAR_BSWAP##bit( ext->val.u##bit ); \
@@ -1147,7 +1150,7 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 
 #define _par_unpack_vfloat(p,ext,type,bit) do { \
     _par_check_blkspc( p->blksize, p->cur, PAR_TYPE##bit##_SIZE ); \
-    _par_verify_attr( ext->attr, PAR_MASK_NUM ); \
+    _PAR_VERIFY_ATTR( ext->attr, PAR_MASK_NUM ); \
     ext->val.f##bit = *(par_float##bit##_t*)(type+PAR_TYPE_SIZE); \
     if( p->endian != ext->endian ){ \
         _PAR_BSWAP##bit( ext->val.u##bit ); \
@@ -1163,20 +1166,21 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
         par_type_t *type = (par_type_t*)p->mem + p->cur;
         uint8_t bitsize = 0;
         
-        // set endian, kind and flag value
+        // init
         ext->isa = type->isa & PAR_MASK_ISA;
         ext->attr = type->isa & PAR_MASK_ATTR;
         ext->sign = ext->attr & PAR_MASK_SIGN;
         ext->endian = ext->attr & PAR_MASK_ENDIAN;
         ext->len = 0;
+        
         switch( ext->isa ){
             // 1 byte types
             case PAR_ISA_NIL ... PAR_ISA_NAN:
-                _par_verify_attr( ext->attr, PAR_NOMASK );
+                _PAR_VERIFY_ATTR( ext->attr, PAR_NOMASK );
                 p->cur += PAR_TYPE_SIZE;
             break;
             case PAR_ISA_BOL ... PAR_ISA_EOS:
-                _par_verify_attr( ext->attr, PAR_MASK_BOL );
+                _PAR_VERIFY_ATTR( ext->attr, PAR_MASK_BOL );
                 p->cur += PAR_TYPE_SIZE;
             break;
             
@@ -1238,7 +1242,7 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
             
             case PAR_ISA_ARR ... PAR_ISA_MAP:
                 if( ext->attr & PAR_A_STREAM ){
-                    _par_verify_attr( ext->attr, ~PAR_MASK_BIT );
+                    _PAR_VERIFY_ATTR( ext->attr, ~PAR_MASK_BIT );
                     ext->len = 0;
                     p->cur += PAR_TYPE_SIZE;
                 }
