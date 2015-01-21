@@ -403,7 +403,7 @@ static int unpack_val( lua_State *L, par_unpack_t *p )
                 // endian = 1:big-endian, 0:littel-endian
                 // flag = 1:sign, 0:unsign
                 #define lstate_push_extint( L, ext, bit ) do { \
-                    if( ext.attr & PAR_MASK_SIGN ){ \
+                    if( ext.sign ){ \
                         lua_pushinteger( L, (lua_Integer)ext.val.i##bit ); \
                     } \
                     else { \

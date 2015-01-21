@@ -95,38 +95,18 @@ static inline char *par_strerror( par_error_t err )
 
 // MARK: parcel data format
 
-#define PAR_TYPE_FIELDS \
-    uint_fast8_t isa:5; \
-    uint_fast8_t attr:3 \
-
-
-#define PAR_TYPE_BYTE_FIELDS \
-    uint_fast8_t isa; \
-    uint_fast8_t attr
-
-
 // attributes
 #define PAR_A_NONE      0x0
-// attribute verifying mask
-#define PAR_NOMASK      0x0
-// infinity
-#define PAR_MASK_INF    0x1
-// string
-#define PAR_MASK_STR    0x7
 
 // boolean
 #define PAR_A_FALSE     PAR_A_NONE
 #define PAR_A_TRUE      0x1
-// mask
-#define PAR_MASK_BOL    0x1
 
 // length byte size
 #define PAR_A_BIT8      PAR_A_NONE
 #define PAR_A_BIT16     0x1
 #define PAR_A_BIT32     0x2
 #define PAR_A_BIT64     0x3
-// mask
-#define PAR_MASK_BIT    0x3
 
 #define _par_bit2byte(f)  (1<<(f))
 
@@ -140,11 +120,19 @@ static inline char *par_strerror( par_error_t err )
 // signedness
 #define PAR_A_UNSIGN    PAR_A_NONE
 #define PAR_A_SIGNED    0x1
-// mask
-#define PAR_MASK_SIGN   0x1
 
-// mask number: endianess << 2 | signedness
-#define PAR_MASK_NUM    0x5
+// masks
+#define PAR_NOMASK      PAR_A_NONE
+#define PAR_MASK_ISA    0xF8
+// mask attributes
+#define PAR_MASK_ATTR   0x7
+#define PAR_MASK_NUM    0x5     // endianess | signedness
+#define PAR_MASK_ENDIAN 0x4
+#define PAR_MASK_BIT    0x3
+#define PAR_MASK_SIGN   0x1
+#define PAR_MASK_INF    0x1
+#define PAR_MASK_BOL    0x1
+#define PAR_MASK_STR    PAR_MASK_ATTR
 
 
 #define _par_verify_attr(attr,mask) do { \
@@ -161,7 +149,7 @@ enum {
     // 1 byte types
     //
     // -----------------+----+
-    // type 0-2         |attr
+    // type             |attr
     // -----------------+----+
     // PAR_ISA_NIL 00000|000
     // -----------------+----+
@@ -170,48 +158,48 @@ enum {
     // PAR_ISA_NAN 00010|000
     // -----------------+----+
     PAR_ISA_NIL = 0,    // nil
-    PAR_ISA_I0,         // zero value
-    PAR_ISA_NAN,        // NaN value
+    PAR_ISA_I0  = 0x8,  // zero value
+    PAR_ISA_NAN = 0x10, // NaN value
 
     //
     // -----------------+----+
-    // type 3           |attr
+    // type             |attr
     // -----------------+----+
     // PAR_ISA_BOL 00011|00X
     // -----------------+----+
     // X: 0 = PAR_A_FALSE, 1 = PAR_A_TRUE
     //
-    PAR_ISA_BOL,        // boolean
+    PAR_ISA_BOL = 0x18, // boolean
 
     //
     // -----------------+----+
-    // type 4           |attr
+    // type             |attr
     // -----------------+----+
     // PAR_ISA_INF 00100|00X
     // -----------------+----+
     // X: 0 = PAR_A_UNSIGN, 1 = PAR_A_SIGNED
     //
-    PAR_ISA_INF,        // infinity value
+    PAR_ISA_INF = 0x20, // infinity value
 
     //
     // -----------------+----+
-    // type 5-6         |attr
+    // type             |attr
     // -----------------+----+
-    // PAR_ISA_EMP 00101|00X
+    // PAR_ISA_EMP 00101|X00
     // -----------------+----+
-    // PAR_ISA_EOS 00110|00X
+    // PAR_ISA_EOS 00110|X00
     // -----------------+----+
     // X: 0 = PAR_A_LENDIAN, 1 = PAR_A_BENDIAN
     //
-    PAR_ISA_EMP,        // empty table
-    PAR_ISA_EOS,        // end-of-stream
+    PAR_ISA_EMP = 0x28, // empty table
+    PAR_ISA_EOS = 0x30, // end-of-stream
 
 
     //
     // 1+[1-8] byte types
     //
     // -----------------+----+
-    // type 7-12        |attr
+    // type             |attr
     // -----------------+----+
     // PAR_ISA_I8  00111|X0Y
     // -----------------+----+
@@ -244,19 +232,19 @@ enum {
     // -------+---------------------+
     //
     // integral number
-    PAR_ISA_I8,         // 8 bit
-    PAR_ISA_I16,        // 16 bit
-    PAR_ISA_I32,        // 32 bit
-    PAR_ISA_I64,        // 64 bit
+    PAR_ISA_I8  = 0x38, // 8 bit
+    PAR_ISA_I16 = 0x40, // 16 bit
+    PAR_ISA_I32 = 0x48, // 32 bit
+    PAR_ISA_I64 = 0x50, // 64 bit
     // floating-point number
-    PAR_ISA_F32,        // 32 bit
-    PAR_ISA_F64,        // 64 bit
+    PAR_ISA_F32 = 0x58, // 32 bit
+    PAR_ISA_F64 = 0x60, // 64 bit
 
     //
     // 1+[0-8] byte types
     //
     // -----------------+---+
-    // type 13-14       |attr
+    // type             |attr
     // -----------------+---+
     // PAR_ISA_ARR 01101|XYY
     // -----------------+---+
@@ -294,14 +282,14 @@ enum {
     // type(1)| serialized items... | PAR_ISA_EOS(1)
     // -------+---------------------+---------------+
     //
-    PAR_ISA_ARR,        // array
-    PAR_ISA_MAP,        // map  
+    PAR_ISA_ARR = 0x68, // array
+    PAR_ISA_MAP = 0x70, // map  
 
     //
     // 1+[1-8] byte types
     //
     // -----------------+----+
-    // type 15          |attr
+    // type             |attr
     // -----------------+----+
     // PAR_ISA_REF 01111|0XX
     // -----------------+----+
@@ -325,13 +313,13 @@ enum {
     // type(1)| previous position(XX)
     // -------+----------------------+
     //
-    PAR_ISA_REF,        // reference
+    PAR_ISA_REF = 0x78, // reference
 
     //
     // 1+[1-8] byte types
     //
     // -----------------+----+
-    // type 15-17       |attr
+    // type             |attr
     // -----------------+----+
     // PAR_ISA_RAW 10000|XYY
     // -----------------+----+
@@ -358,16 +346,17 @@ enum {
     // type(1)| data size(YY) | data(uint YY bit length)...
     // -------+---------------+-----------------------------
     //
-    PAR_ISA_RAW,        // raw data
-    PAR_ISA_STR         // string
+    PAR_ISA_RAW = 0x80, // raw data
+    PAR_ISA_STR = 0x88  // string
 };
 
 
+// floating-point numbers
+typedef float par_float32_t;
+typedef double par_float64_t;
+
 typedef union {
-    uint_fast8_t size[1];
-    struct {
-        PAR_TYPE_FIELDS;
-    } data;
+    uint_fast8_t isa;
 } par_type_t;
 
 typedef uint_fast64_t par_typelen_t;
@@ -404,31 +393,6 @@ typedef par_typex_t par_type64_t;
 #define PAR_TYPE32_SIZE     sizeof(par_type32_t)
 #define PAR_TYPE64_SIZE     sizeof(par_type64_t)
 
-
-// to use unpack
-typedef float par_float32_t;
-typedef double par_float64_t;
-
-typedef struct {
-    PAR_TYPE_BYTE_FIELDS;
-    uint_fast64_t len;
-    union {
-        char *str;
-        int_fast8_t i8;
-        uint_fast8_t u8;
-        int_fast16_t i16;
-        uint_fast16_t u16;
-        int_fast32_t i32;
-        uint_fast32_t u32;
-        int_fast64_t i64;
-        uint_fast64_t u64;
-        par_float32_t f32;
-        par_float64_t f64;
-    } val;
-} par_extract_t;
-
-#undef PAR_TYPE_FIELDS
-#undef PAR_TYPE_BYTE_FIELDS
 
 
 // MARK: default memory block size
@@ -586,12 +550,11 @@ static inline int _par_pack_type( par_pack_t *p, uint8_t isa, uint8_t attr,
 {
     par_type_t *pval = _par_pack_slice( p, PAR_TYPE_SIZE );
     
-    pval->data.isa = isa;
     if( attr & ~domain ){
         errno = PARCEL_EDOM;
         return -1;
     }
-    pval->data.attr = attr;
+    pval->isa = isa | attr;
     
     return 0;
 }
@@ -622,8 +585,7 @@ static inline int _par_pack_type( par_pack_t *p, uint8_t isa, uint8_t attr,
 // packing integeral number
 #define _par_pack_bitint(p,bit,v,sign) do { \
     par_type_t *pval = _par_pack_slice( p, PAR_TYPE##bit##_SIZE ); \
-    pval->data.isa = PAR_ISA_I##bit; \
-    pval->data.attr = p->endian|sign; \
+    pval->isa = PAR_ISA_I##bit | p->endian | sign; \
     *((uint_fast##bit##_t*)(pval+PAR_TYPE_SIZE)) = (uint_fast##bit##_t)v; \
 }while(0)
 
@@ -671,8 +633,7 @@ static inline int par_pack_int( par_pack_t *p, int_fast64_t num )
 // packing floating-point number
 #define _par_pack_bitfloat(p,bit,v,sign) do { \
     par_type_t *pval = _par_pack_slice( p, PAR_TYPE##bit##_SIZE ); \
-    pval->data.isa = PAR_ISA_F##bit; \
-    pval->data.attr = p->endian|(sign); \
+    pval->isa = PAR_ISA_F##bit | p->endian | (sign); \
     *((par_float##bit##_t*)(pval+PAR_TYPE_SIZE)) = (par_float##bit##_t)(v); \
 }while(0)
 
@@ -707,8 +668,7 @@ static inline int _par_pack_typex( par_pack_t *p, uint8_t isa, uint8_t size,
         
         *idx = p->cur;
         pval = _par_pack_slice( p, PAR_TYPEX_SIZE );
-        pval->data.isa = isa;
-        pval->data.attr = size;
+        pval->isa = isa | size;
         
         return 0;
     }
@@ -737,11 +697,11 @@ static inline int par_pack_tbllen( par_pack_t *p, size_t idx, size_t len )
         }
         
         pval = (par_type_t*)(p->mem + idx);
-        switch( pval->data.isa ){
+        switch( pval->isa & PAR_MASK_ISA ){
             case PAR_ISA_ARR:
             case PAR_ISA_MAP:
                 // operation not supported
-                if( pval->data.attr > PAR_A_BIT64 ){
+                if( ( pval->isa & PAR_MASK_ATTR ) > PAR_A_BIT64 ){
                     errno = PARCEL_ENOTSUP;
                     return -1;
                 }
@@ -768,27 +728,26 @@ static inline int par_pack_str( par_pack_t *p, void *val, size_t len )
     if( len & 0xFFFFFFFF00000000 ){
         pval = _par_pack_slice( p, PAR_TYPE64_SIZE );
         *(uint_fast64_t*)(pval+PAR_TYPE_SIZE) = (uint_fast64_t)len;
-        pval->data.attr = p->endian | PAR_A_BIT64;
+        pval->isa = PAR_ISA_STR | p->endian | PAR_A_BIT64;
     }
     // 32bit
     else if( len & 0xFFFF0000 ){
         pval = _par_pack_slice( p, PAR_TYPE32_SIZE );
         *(uint_fast32_t*)(pval+PAR_TYPE_SIZE) = (uint_fast32_t)len;
-        pval->data.attr = p->endian | PAR_A_BIT32;
+        pval->isa = PAR_ISA_STR | p->endian | PAR_A_BIT32;
     }
     // 16bit
     else if( len & 0xFF00 ){
         pval = _par_pack_slice( p, PAR_TYPE16_SIZE );
         *(uint_fast16_t*)(pval+PAR_TYPE_SIZE) = (uint_fast16_t)len;
-        pval->data.attr = p->endian | PAR_A_BIT16;
+        pval->isa = PAR_ISA_STR | p->endian | PAR_A_BIT16;
     }
     // 8bit
     else {
         pval = _par_pack_slice( p, PAR_TYPE8_SIZE );
         *(uint_fast8_t*)(pval+PAR_TYPE_SIZE) = (uint_fast8_t)len;
-        pval->data.attr = p->endian | PAR_A_BIT8;
+        pval->isa = PAR_ISA_STR | p->endian | PAR_A_BIT8;
     }
-    pval->data.isa = PAR_ISA_STR;
     
     if( p->reducer )
     {
@@ -844,12 +803,37 @@ typedef struct {
 } par_unpack_t;
 
 
+
+typedef struct {
+    uint_fast8_t isa;
+    uint_fast8_t endian;
+    uint_fast8_t sign;
+    uint_fast8_t attr;
+    uint_fast64_t len;
+    union {
+        char *str;
+        int_fast8_t i8;
+        uint_fast8_t u8;
+        int_fast16_t i16;
+        uint_fast16_t u16;
+        int_fast32_t i32;
+        uint_fast32_t u32;
+        int_fast64_t i64;
+        uint_fast64_t u64;
+        par_float32_t f32;
+        par_float64_t f64;
+    } val;
+} par_extract_t;
+
+
 static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 {
     static const int endian = 1;
     
     // 0: little-endian, 1: big-endian
     p->endian = !(*(char*)&endian);
+    p->endian <<= 2;
+    
     p->cur = 0;
     p->mem = mem;
     p->blksize = blksize;
@@ -882,7 +866,7 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
     _par_verify_attr( ext->attr, PAR_MASK_STR ); \
     ext->len = *(uint_fast##bit##_t*)( type + PAR_TYPE_SIZE ); \
     ext->val.str = (char*)(type+PAR_TYPE##bit##_SIZE); \
-    if( bit > 8 && p->endian != ( ext->attr >> 2 ) ){ \
+    if( bit > 8 && p->endian != ext->endian ){ \
         _par_bswap##bit( ext->len ); \
     } \
 }while(0)
@@ -892,7 +876,7 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
     _par_check_blkspc( p->blksize, p->cur, PAR_TYPE##bit##_SIZE ); \
     _par_verify_attr( ext->attr, PAR_MASK_NUM ); \
     ext->val.u##bit = *(uint_fast##bit##_t*)(type+PAR_TYPE_SIZE); \
-    if( bit > 8 && p->endian != ( ext->attr >> 2 ) ){ \
+    if( bit > 8 && p->endian != ext->endian ){ \
         _par_bswap##bit( ext->val.u##bit ); \
     } \
 }while(0)
@@ -902,7 +886,7 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
     _par_check_blkspc( p->blksize, p->cur, PAR_TYPE##bit##_SIZE ); \
     _par_verify_attr( ext->attr, PAR_MASK_NUM ); \
     ext->val.f##bit = *(par_float##bit##_t*)(type+PAR_TYPE_SIZE); \
-    if( p->endian != ( ext->attr >> 2 ) ){ \
+    if( p->endian != ext->endian ){ \
         _par_bswap##bit( ext->val.u##bit ); \
     } \
 }while(0)
@@ -917,8 +901,10 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
         uint8_t bitsize = 0;
         
         // set endian, kind and flag value
-        ext->isa = type->data.isa;
-        ext->attr = type->data.attr;
+        ext->isa = type->isa & PAR_MASK_ISA;
+        ext->attr = type->isa & PAR_MASK_ATTR;
+        ext->sign = ext->attr & PAR_MASK_SIGN;
+        ext->endian = ext->attr & PAR_MASK_ENDIAN;
         ext->len = 0;
         switch( ext->isa ){
             // 1 byte types
