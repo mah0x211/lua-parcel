@@ -108,6 +108,7 @@ static inline char *par_strerror( par_error_t err )
 #define PAR_A_BIT32     0x2
 #define PAR_A_BIT64     0x3
 
+// convert bit value to byte size
 #define _PAR_BIT2BYTE(f)    (1<<(f))
 
 // array/map stream
@@ -133,16 +134,6 @@ static inline char *par_strerror( par_error_t err )
 #define PAR_MASK_INF    0x1
 #define PAR_MASK_BOL    0x1
 #define PAR_MASK_STR    PAR_MASK_ATTR
-
-
-// verify attribute
-#define _PAR_VERIFY_ATTR(attr,mask) do { \
-    if((attr) & ~(mask)){ \
-        errno = PARCEL_EILSEQ; \
-        return -1; \
-    } \
-}while(0)
-
 
 
 // type(5): 0-31
@@ -711,7 +702,6 @@ static inline int par_spack_eos( par_spack_t *p )
                            PAR_NOMASK );
 }
 
-
 // MARK: undef _PAR_PACK_TYPE
 #undef _PAR_PACK_TYPE
 
@@ -1077,7 +1067,6 @@ typedef struct {
 } par_unpack_t;
 
 
-
 typedef struct {
     uint_fast8_t isa;
     uint_fast8_t endian;
@@ -1114,6 +1103,15 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 }
 
 
+// verify attribute
+#define _PAR_VERIFY_ATTR(attr,mask) do { \
+    if((attr) & ~(mask)){ \
+        errno = PARCEL_EILSEQ; \
+        return -1; \
+    } \
+}while(0)
+
+
 // swap byteorder
 #define _PAR_BSWAP8(v)
 
@@ -1134,16 +1132,23 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 }while(0)
 
 
+// extract nbit len value
+#define _PAR_UNPACK_NBITLEN( p, type, ext, bit ) do { \
+    (ext)->len = *(uint_fast##bit##_t*)( (type) + PAR_TYPE_SIZE ); \
+    if( bit > 8 && (p)->endian != (ext)->endian ){ \
+        _PAR_BSWAP##bit( (ext)->len ); \
+    } \
+    (p)->cur += PAR_TYPE##bit##_SIZE; \
+}while(0)
+
+
 // type: PAR_ISA_RAW, PAR_ISA_STR
 // len: *(uint_fast[8-64]_t*)(mem + cur + PAR_TYPE_SIZE)
 // val: mem + cur + PAR_TYPE[8-64]_SIZE
 #define _PAR_UNPACK_NBIT_BYTEA( p, type, ext, bit ) do { \
-    (ext)->len = *(uint_fast##bit##_t*)( (type) + PAR_TYPE_SIZE ); \
     (ext)->val.str = (char*)( (type) + PAR_TYPE##bit##_SIZE ); \
-    if( bit > 8 && (p)->endian != (ext)->endian ){ \
-        _PAR_BSWAP##bit( (ext)->len ); \
-    } \
-    (p)->cur += PAR_TYPE##bit##_SIZE + (ext)->len; \
+    _PAR_UNPACK_NBITLEN( p, type, ext, bit ); \
+    (p)->cur += (ext)->len; \
 }while(0)
 
 
