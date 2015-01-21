@@ -1142,6 +1142,26 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 }while(0)
 
 
+#define _PAR_UNPACK_ARRMAP( p, type, ext ) do { \
+    uint_fast8_t bit = (ext)->attr & PAR_MASK_BIT; \
+    _PAR_CHECK_BLKSPC( (p)->blksize, (p)->cur, _PAR_BIT2BYTE( bit ) ); \
+    switch( bit ){ \
+        case PAR_A_BIT8: \
+            _PAR_UNPACK_NBITLEN( p, type, ext, 8 ); \
+        break; \
+        case PAR_A_BIT16: \
+            _PAR_UNPACK_NBITLEN( p, type, ext, 16 ); \
+        break; \
+        case PAR_A_BIT32: \
+            _PAR_UNPACK_NBITLEN( p, type, ext, 32 ); \
+        break; \
+        case PAR_A_BIT64: \
+            _PAR_UNPACK_NBITLEN( p, type, ext, 64 ); \
+        break; \
+    } \
+}while(0)
+
+
 // type: PAR_ISA_RAW, PAR_ISA_STR
 // len: *(uint_fast[8-64]_t*)(mem + cur + PAR_TYPE_SIZE)
 // val: mem + cur + PAR_TYPE[8-64]_SIZE
@@ -1194,13 +1214,11 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 }while(0)
 
 
-
 static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
 {
     if( p->cur < p->blksize )
     {
         par_type_t *type = (par_type_t*)p->mem + p->cur;
-        uint8_t bitsize = 0;
         
         // init
         ext->isa = type->isa & PAR_MASK_ISA;
@@ -1260,38 +1278,11 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
                     _PAR_VERIFY_ATTR( ext->attr, PAR_A_STREAM );
                     p->cur += PAR_TYPE_SIZE;
                 }
-                else
-                {
-                    bitsize = ext->attr & PAR_MASK_BIT;
-                    _PAR_CHECK_BLKSPC( p->blksize, p->cur, 
-                                       _PAR_BIT2BYTE( bitsize ) );
-                    switch( bitsize ){
-                        case PAR_A_BIT8:
-                            ext->len = *(uint_fast8_t*)( type + PAR_TYPE_SIZE );
-                        break;
-                        case PAR_A_BIT16:
-                            ext->len = *(uint_fast16_t*)( type + PAR_TYPE_SIZE );
-                        break;
-                        case PAR_A_BIT32:
-                            ext->len = *(uint_fast32_t*)( type + PAR_TYPE_SIZE );
-                        break;
-                        case PAR_A_BIT64:
-                            ext->len = *(uint_fast64_t*)( type + PAR_TYPE_SIZE );
-                        break;
-                        // illegal byte sequence
-                        default:
-                            errno = PARCEL_EILSEQ;
-                            return -1;
-                    }
-                    
-                    // swap byteorder
-                    if( p->endian != ( ext->attr >> 2 ) ){
-                        _PAR_BSWAP64( ext->len );
-                    }
-                    p->cur += PAR_TYPE_SIZE + _PAR_BIT2BYTE( bitsize );
+                else {
+                    _PAR_UNPACK_ARRMAP( p, type, ext );
                 }
             break;
-
+            
             // illegal byte sequence
             default:
                 errno = PARCEL_EILSEQ;
@@ -1306,6 +1297,32 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
     errno = PARCEL_ENODATA;
     return 0;
 }
+
+
+// MARK: undef _PAR_BSWAP8
+#undef _PAR_BSWAP8
+// MARK: undef _PAR_BSWAP16
+#undef _PAR_BSWAP16
+// MARK: undef _PAR_BSWAP32
+#undef _PAR_BSWAP32
+// MARK: undef _PAR_BSWAP64
+#undef _PAR_BSWAP64
+// MARK: undef _PAR_UNPACK_NBITLEN
+#undef _PAR_UNPACK_NBITLEN
+// MARK: undef _PAR_UNPACK_ARRMAP
+#undef _PAR_UNPACK_ARRMAP
+// MARK: undef _PAR_UNPACK_NBIT_BYTEA
+#undef _PAR_UNPACK_NBIT_BYTEA
+// MARK: undef _PAR_UNPACK_BYTEA
+#undef _PAR_UNPACK_BYTEA
+// MARK: undef _PAR_UNPACK_BITINT
+#undef _PAR_UNPACK_BITINT
+// MARK: undef _PAR_UNPACK_BITFLOAT
+#undef _PAR_UNPACK_BITFLOAT
+// MARK: undef _PAR_VERIFY_ATTR
+#undef _PAR_VERIFY_ATTR
+// MARK: undef _PAR_BIT2BYTE
+#undef _PAR_BIT2BYTE
 
 
 #endif
