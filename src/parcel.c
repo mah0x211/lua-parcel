@@ -316,7 +316,7 @@ static int spack_val( par_spack_t *p, lua_State *L, int idx )
     ktype = lua_type( L, -2 );
     switch( ktype ){
         case LUA_TNUMBER:
-            if( par_spack_arr( p ) != 0 ){
+            if( par_spack_sar( p ) != 0 ){
                 return -1;
             }
         break;

@@ -687,7 +687,7 @@ static inline int par_spack_empty( par_spack_t *p )
 }
 
 // stream array
-static inline int par_spack_arr( par_spack_t *p )
+static inline int par_spack_sar( par_spack_t *p )
 {
     return _PAR_PACK_TYPE( p, _par_pack_reduce, PAR_ISA_SAR, PAR_A_NONE, 
                            PAR_NOMASK );
