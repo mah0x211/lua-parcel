@@ -1165,8 +1165,8 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 
 
 #define _par_unpack_vint(p,ext,type,bit) do { \
-    _PAR_CHECK_BLKSPC( p->blksize, p->cur, PAR_TYPE##bit##_SIZE ); \
     _PAR_VERIFY_ATTR( ext->attr, PAR_MASK_NUM ); \
+    _PAR_CHECK_BLKSPC( (p)->blksize, (p)->cur, PAR_TYPE##bit##_SIZE ); \
     ext->val.u##bit = *(uint_fast##bit##_t*)(type+PAR_TYPE_SIZE); \
     if( bit > 8 && p->endian != ext->endian ){ \
         _PAR_BSWAP##bit( ext->val.u##bit ); \
@@ -1175,8 +1175,8 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 
 
 #define _par_unpack_vfloat(p,ext,type,bit) do { \
-    _PAR_CHECK_BLKSPC( p->blksize, p->cur, PAR_TYPE##bit##_SIZE ); \
     _PAR_VERIFY_ATTR( ext->attr, PAR_MASK_NUM ); \
+    _PAR_CHECK_BLKSPC( p->blksize, p->cur, PAR_TYPE##bit##_SIZE ); \
     ext->val.f##bit = *(par_float##bit##_t*)(type+PAR_TYPE_SIZE); \
     if( p->endian != ext->endian ){ \
         _PAR_BSWAP##bit( ext->val.u##bit ); \
