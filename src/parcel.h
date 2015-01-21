@@ -552,16 +552,6 @@ static void *_par_pack_reduce( par_spack_t *p, size_t bytes )
 }
 
 
-static inline void *_par_pack_update_cur( par_pack_t *p, size_t bytes )
-{
-    void *mem = p->mem + p->cur;
-
-    p->cur += bytes;
-    
-    return mem;
-}
-
-
 // allocate sizeof(t) and extra bytes
 #define _PAR_PACK_SLICE( p, fn, l ) ({ \
     void *mem = fn( p, l ); \
