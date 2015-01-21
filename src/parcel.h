@@ -994,7 +994,7 @@ static inline int par_pack_mapidx( par_pack_t *p, uint8_t bit, size_t *idx )
 
 
 
-static inline int par_pack_tbllen( par_pack_t *p, size_t idx, size_t len )
+static inline int par_pack_arrmaplen( par_pack_t *p, size_t idx, size_t len )
 {
     // overflow
     if( idx > p->cur ){

@@ -74,7 +74,7 @@ static int pack_tbl( par_pack_t *b, lua_State *L, int idx, int ktype,
     } while( lua_next( L, -2 ) );
     
     // set length
-    return par_pack_tbllen( b, vidx, len );
+    return par_pack_arrmaplen( b, vidx, len );
 }
 
 
