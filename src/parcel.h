@@ -108,7 +108,7 @@ static inline char *par_strerror( par_error_t err )
 #define PAR_A_BIT32     0x2
 #define PAR_A_BIT64     0x3
 
-#define _par_bit2byte(f)  (1<<(f))
+#define _PAR_BIT2BYTE(f)    (1<<(f))
 
 // array/map stream
 #define PAR_A_STREAM    0x4
@@ -429,7 +429,7 @@ static inline size_t _par_align_blksize( size_t blksize )
 
 
 // check available block space
-#define _par_check_blkspc(blksize,cur,req) do { \
+#define _PAR_CHECK_BLKSPC(blksize,cur,req) do { \
     if( (cur) >= (blksize) || ((blksize)-(cur)) < (req) ){ \
         errno = PARCEL_ENOBLKS; \
         return -1; \
@@ -981,7 +981,7 @@ static inline int _par_pack_typexidx( par_pack_t *p, uint8_t isa, uint8_t bit,
     
     *idx = p->cur;
     pval = _PAR_PACK_SLICE( p, _par_pack_increase, 
-                            PAR_TYPE_SIZE + _par_bit2byte( bit ) );
+                            PAR_TYPE_SIZE + _PAR_BIT2BYTE( bit ) );
     pval->isa = isa | bit;
 
     return 0;
@@ -1020,7 +1020,7 @@ static inline int par_pack_tbllen( par_pack_t *p, size_t idx, size_t len )
                     uint_fast8_t bit = pval->isa & PAR_MASK_BIT;
                     
                     // overflow
-                    if( _par_bit2byte( bit ) > ( p->cur - idx ) ){
+                    if( _PAR_BIT2BYTE( bit ) > ( p->cur - idx ) ){
                         errno = PARCEL_EDOM;
                         return -1;
                     }
@@ -1139,7 +1139,7 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 
 
 #define _par_unpack_vint(p,ext,type,bit) do { \
-    _par_check_blkspc( p->blksize, p->cur, PAR_TYPE##bit##_SIZE ); \
+    _PAR_CHECK_BLKSPC( p->blksize, p->cur, PAR_TYPE##bit##_SIZE ); \
     _PAR_VERIFY_ATTR( ext->attr, PAR_MASK_NUM ); \
     ext->val.u##bit = *(uint_fast##bit##_t*)(type+PAR_TYPE_SIZE); \
     if( bit > 8 && p->endian != ext->endian ){ \
@@ -1149,7 +1149,7 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 
 
 #define _par_unpack_vfloat(p,ext,type,bit) do { \
-    _par_check_blkspc( p->blksize, p->cur, PAR_TYPE##bit##_SIZE ); \
+    _PAR_CHECK_BLKSPC( p->blksize, p->cur, PAR_TYPE##bit##_SIZE ); \
     _PAR_VERIFY_ATTR( ext->attr, PAR_MASK_NUM ); \
     ext->val.f##bit = *(par_float##bit##_t*)(type+PAR_TYPE_SIZE); \
     if( p->endian != ext->endian ){ \
@@ -1214,8 +1214,8 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
             
             case PAR_ISA_STR:
                 bitsize = ext->attr & PAR_MASK_BIT;
-                _par_check_blkspc( p->blksize, p->cur, 
-                                   _par_bit2byte( bitsize ) );
+                _PAR_CHECK_BLKSPC( p->blksize, p->cur, 
+                                   _PAR_BIT2BYTE( bitsize ) );
                 switch( bitsize ){
                     case PAR_A_BIT8:
                         _par_unpack_vstr( p, ext, type, 8 );
@@ -1249,8 +1249,8 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
                 else
                 {
                     bitsize = ext->attr & PAR_MASK_BIT;
-                    _par_check_blkspc( p->blksize, p->cur, 
-                                       _par_bit2byte( bitsize ) );
+                    _PAR_CHECK_BLKSPC( p->blksize, p->cur, 
+                                       _PAR_BIT2BYTE( bitsize ) );
                     switch( bitsize ){
                         case PAR_A_BIT8:
                             ext->len = *(uint_fast8_t*)( type + PAR_TYPE_SIZE );
@@ -1274,7 +1274,7 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
                     if( p->endian != ( ext->attr >> 2 ) ){
                         _PAR_BSWAP64( ext->len );
                     }
-                    p->cur += PAR_TYPE_SIZE + _par_bit2byte( bitsize );
+                    p->cur += PAR_TYPE_SIZE + _PAR_BIT2BYTE( bitsize );
                 }
             break;
 
