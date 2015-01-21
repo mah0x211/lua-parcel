@@ -1125,15 +1125,32 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 }while(0)
 
 
-
+// type: PAR_ISA_RAW, PAR_ISA_STR
 // len: *(uint_fast[8-64]_t*)(mem + cur + PAR_TYPE_SIZE)
 // val: mem + cur + PAR_TYPE[8-64]_SIZE
-#define _par_unpack_vstr( p, ext, type, bit ) do { \
-    _PAR_VERIFY_ATTR( ext->attr, PAR_MASK_STR ); \
-    ext->len = *(uint_fast##bit##_t*)( type + PAR_TYPE_SIZE ); \
-    ext->val.str = (char*)(type+PAR_TYPE##bit##_SIZE); \
-    if( bit > 8 && p->endian != ext->endian ){ \
-        _PAR_BSWAP##bit( ext->len ); \
+#define _PAR_UNPACK_NBIT_BYTEA( p, type, ext, bit ) do { \
+    (ext)->len = *(uint_fast##bit##_t*)( (type) + PAR_TYPE_SIZE ); \
+    (ext)->val.str = (char*)( (type) + PAR_TYPE##bit##_SIZE ); \
+    (p)->cur += PAR_TYPE##bit##_SIZE + (ext)->len; \
+}while(0)
+
+
+#define _PAR_UNPACK_BYTEA( p, type, ext ) do { \
+    uint_fast8_t bit = (type)->isa & PAR_MASK_BIT; \
+    _PAR_CHECK_BLKSPC( p->blksize, p->cur, _PAR_BIT2BYTE( bit ) ); \
+    switch( bit ){ \
+        case PAR_A_BIT8: \
+            _PAR_UNPACK_NBIT_BYTEA( p, type, ext, 8 ); \
+        break; \
+        case PAR_A_BIT16: \
+            _PAR_UNPACK_NBIT_BYTEA( p, type, ext, 16 ); \
+        break; \
+        case PAR_A_BIT32: \
+            _PAR_UNPACK_NBIT_BYTEA( p, type, ext, 32 ); \
+        break; \
+        case PAR_A_BIT64: \
+            _PAR_UNPACK_NBIT_BYTEA( p, type, ext, 64 ); \
+        break; \
     } \
 }while(0)
 
@@ -1212,32 +1229,8 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
                 p->cur += PAR_TYPE64_SIZE;
             break;
             
-            case PAR_ISA_STR:
-                bitsize = ext->attr & PAR_MASK_BIT;
-                _PAR_CHECK_BLKSPC( p->blksize, p->cur, 
-                                   _PAR_BIT2BYTE( bitsize ) );
-                switch( bitsize ){
-                    case PAR_A_BIT8:
-                        _par_unpack_vstr( p, ext, type, 8 );
-                        p->cur += PAR_TYPE8_SIZE + ext->len;
-                    break;
-                    case PAR_A_BIT16:
-                        _par_unpack_vstr( p, ext, type, 16 );
-                        p->cur += PAR_TYPE16_SIZE + ext->len;
-                    break;
-                    case PAR_A_BIT32:
-                        _par_unpack_vstr( p, ext, type, 32 );
-                        p->cur += PAR_TYPE32_SIZE + ext->len;
-                    break;
-                    case PAR_A_BIT64:
-                        _par_unpack_vstr( p, ext, type, 64 );
-                        p->cur += PAR_TYPE64_SIZE + ext->len;
-                    break;
-                    // illegal byte sequence
-                    default:
-                        errno = PARCEL_EILSEQ;
-                        return -1;
-                }
+            case PAR_ISA_RAW ... PAR_ISA_STR:
+                _PAR_UNPACK_BYTEA( p, type, ext );
             break;
             
             case PAR_ISA_ARR ... PAR_ISA_MAP:
