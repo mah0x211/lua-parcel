@@ -6,7 +6,9 @@ binary serialization module.
 
 ## TODO
 
-- single-precision floating-point type support.
-- string compression support.
+- add the stream processing API.
 - byte array type support.
+- reference type support.
+- improve performance of the deserialize API.
 - stream deserialization support.
+- string compression support.
