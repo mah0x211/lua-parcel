@@ -1104,18 +1104,18 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
 
 
 // swap byteorder
-#define _par_bswap8(v)
+#define _PAR_BSWAP8(v)
 
-#define _par_bswap16(v) do { \
+#define _PAR_BSWAP16(v) do { \
     v = ((((v)>>8)&0x00FF)|(((v)<<8)&0xFF00)); \
 }while(0)
 
-#define _par_bswap32(v) do { \
+#define _PAR_BSWAP32(v) do { \
     v = ((((v)>>24)&0x000000FF)|(((v)>>8)&0x0000FF00) | \
          (((v)<<8)&0x00FF0000)|(((v)<<24)&0xFF000000)); \
 }while(0)
 
-#define _par_bswap64(v) do { \
+#define _PAR_BSWAP64(v) do { \
     v = ((((v)>>56)&0x00000000000000FF)|(((v)>>40)&0x000000000000FF00) | \
          (((v)>>24)&0x0000000000FF0000)|(((v)>>8)&0x00000000FF000000) | \
          (((v)<<8)&0x000000FF00000000)|(((v)<<24)&0x0000FF0000000000) | \
@@ -1130,7 +1130,7 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
     ext->len = *(uint_fast##bit##_t*)( type + PAR_TYPE_SIZE ); \
     ext->val.str = (char*)(type+PAR_TYPE##bit##_SIZE); \
     if( bit > 8 && p->endian != ext->endian ){ \
-        _par_bswap##bit( ext->len ); \
+        _PAR_BSWAP##bit( ext->len ); \
     } \
 }while(0)
 
@@ -1140,7 +1140,7 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
     _par_verify_attr( ext->attr, PAR_MASK_NUM ); \
     ext->val.u##bit = *(uint_fast##bit##_t*)(type+PAR_TYPE_SIZE); \
     if( bit > 8 && p->endian != ext->endian ){ \
-        _par_bswap##bit( ext->val.u##bit ); \
+        _PAR_BSWAP##bit( ext->val.u##bit ); \
     } \
 }while(0)
 
@@ -1150,7 +1150,7 @@ static inline void par_unpack_init( par_unpack_t *p, void *mem, size_t blksize )
     _par_verify_attr( ext->attr, PAR_MASK_NUM ); \
     ext->val.f##bit = *(par_float##bit##_t*)(type+PAR_TYPE_SIZE); \
     if( p->endian != ext->endian ){ \
-        _par_bswap##bit( ext->val.u##bit ); \
+        _PAR_BSWAP##bit( ext->val.u##bit ); \
     } \
 }while(0)
 
@@ -1268,7 +1268,7 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
                     
                     // swap byteorder
                     if( p->endian != ( ext->attr >> 2 ) ){
-                        _par_bswap64( ext->len );
+                        _PAR_BSWAP64( ext->len );
                     }
                     p->cur += PAR_TYPE_SIZE + _par_bit2byte( bitsize );
                 }
