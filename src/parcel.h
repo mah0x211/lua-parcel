@@ -435,10 +435,8 @@ static inline size_t _par_align_blksize( size_t blksize )
 }while(0)
 
 
-// MARK: packing
 
-// for stream
-typedef int (*par_reduce_t)( void *mem, size_t bytes, void *udata );
+// MARK: packing
 
 typedef struct {
     uint8_t endian;
@@ -448,14 +446,10 @@ typedef struct {
     size_t nblk;
     size_t bytes;
     void *mem;
-    // stream
-    par_reduce_t reducer;
-    void *udata;
 } par_pack_t;
 
 
-static inline int par_pack_init( par_pack_t *p, size_t blksize, 
-                                 par_reduce_t reducer, void *udata )
+static inline int par_pack_init( par_pack_t *p, size_t blksize )
 {
     blksize = _par_align_blksize( blksize );
     if( ( p->mem = malloc( blksize ) ) ){
@@ -465,6 +459,36 @@ static inline int par_pack_init( par_pack_t *p, size_t blksize,
         p->nblkmax = SIZE_MAX / blksize;
         p->nblk = 1;
         p->bytes = blksize;
+        return 0;
+    }
+    
+    return -1;
+}
+
+
+
+// for stream
+typedef int (*par_reduce_t)( void *mem, size_t bytes, void *udata );
+
+typedef struct {
+    uint8_t endian;
+    size_t cur;
+    size_t blksize;
+    void *mem;
+    // stream
+    par_reduce_t reducer;
+    void *udata;
+} par_spack_t;
+
+
+static inline int par_spack_init( par_spack_t *p, size_t blksize, 
+                                  par_reduce_t reducer, void *udata )
+{
+    blksize = _par_align_blksize( blksize );
+    if( ( p->mem = malloc( blksize ) ) ){
+        p->endian = par_get_endian();
+        p->cur = 0;
+        p->blksize = blksize;
         p->reducer = reducer;
         p->udata = udata;
         return 0;
@@ -474,73 +498,71 @@ static inline int par_pack_init( par_pack_t *p, size_t blksize,
 }
 
 
-static inline void par_pack_dispose( par_pack_t *p )
-{
-    if( p->mem ){
-        free( p->mem );
-        p->mem = NULL;
-    }
-}
+#define par_pack_dispose(p) do { \
+    if( (p)->mem ){ \
+        free( (p)->mem ); \
+        (p)->mem = NULL; \
+    } \
+}while(0)
 
 
-static inline int _par_pack_increase( par_pack_t *p, size_t bytes )
+static void *_par_pack_increase( par_pack_t *p, size_t bytes )
 {
-    if( p->reducer )
+    size_t remain = p->bytes - p->cur;
+    
+    if( remain < bytes )
     {
-        size_t remain = p->blksize - p->cur;
+        size_t nblk = 0;
         
-        // remain >= bytes
-        if( remain >= bytes ){
-            return 0;
-        }
-        // reduce memory
-        else if( p->reducer( p->mem, p->cur, p->udata ) == 0 ){
-            // rewind cursor
-            p->cur = 0;
-            return 0;
-        }
-    }
-    else
-    {
-        size_t remain = p->bytes - p->cur;
-        
-        // remain >= bytes
-        if( remain >= bytes ){
-            return 0;
-        }
-        else
+        // calculate number of block
+        bytes -= remain;
+        nblk += ( bytes / p->blksize ) + !!( bytes % p->blksize );
+        if( nblk < ( p->nblkmax - p->nblk ) )
         {
-            size_t nblk = 0;
+            void *mem = NULL;
             
-            // calculate number of block
-            bytes -= remain;
-            nblk += ( bytes / p->blksize ) + !!( bytes % p->blksize );
-            if( nblk < ( p->nblkmax - p->nblk ) )
-            {
-                void *mem = NULL;
-                
-                bytes = p->blksize * ( p->nblk + nblk );
-                if( ( mem = realloc( p->mem, bytes ) ) ){
-                    p->mem = mem;
-                    p->nblk += nblk;
-                    p->bytes = bytes;
-                    return 0;
-                }
+            bytes = p->blksize * ( p->nblk + nblk );
+            // failed to allocate memory block
+            if( !( mem = realloc( p->mem, bytes ) ) ){
+                return NULL;
             }
-            else {
-                errno = PARCEL_ENOMEM;
-            }
+            // update
+            p->mem = mem;
+            p->nblk += nblk;
+            p->bytes = bytes;
+        }
+        else {
+            errno = PARCEL_ENOMEM;
+            return NULL;
         }
     }
     
-    return -1;
+    return p->mem;
+}
+
+
+static void *_par_pack_reduce( par_spack_t *p, size_t bytes )
+{
+    size_t remain = p->blksize - p->cur;
+    
+    if( remain < bytes )
+    {
+        // failed to reduce memory
+        if( p->reducer( p->mem, p->cur, p->udata ) != 0 ){
+            return NULL;
+        }
+        // rewind cursor
+        p->cur = 0;
+    }
+    
+    return p->mem;
 }
 
 
 static inline void *_par_pack_update_cur( par_pack_t *p, size_t bytes )
 {
     void *mem = p->mem + p->cur;
-    
+
     p->cur += bytes;
     
     return mem;
@@ -548,198 +570,420 @@ static inline void *_par_pack_update_cur( par_pack_t *p, size_t bytes )
 
 
 // allocate sizeof(t) and extra bytes
-#define _par_pack_slice(p,l) ({ \
-    if( _par_pack_increase( p, l ) == -1 ){ \
+#define _PAR_PACK_SLICE( p, fn, l ) ({ \
+    void *mem = fn( p, l ); \
+    if( !mem ){ \
         return -1; \
     } \
-    _par_pack_update_cur( p, l ); \
+    mem = (p)->mem + (p)->cur; \
+    (p)->cur += l; \
+    mem; \
 })
 
 
-static inline int _par_pack_type( par_pack_t *p, uint8_t isa, uint8_t attr, 
-                                  uint8_t domain )
+static inline int _par_pack_type_set( par_type_t *pval, uint8_t type, 
+                                      uint8_t attr, uint8_t domain )
 {
-    par_type_t *pval = _par_pack_slice( p, PAR_TYPE_SIZE );
-    
     if( attr & ~domain ){
         errno = PARCEL_EDOM;
         return -1;
     }
-    pval->isa = isa | attr;
+    pval->isa = type | attr;
     
     return 0;
 }
 
-#define par_pack_nil(p) \
-    _par_pack_type(p, PAR_ISA_NIL, PAR_A_NONE, PAR_NOMASK)
 
-#define par_pack_zero(p) \
-    _par_pack_type(p, PAR_ISA_I0, PAR_A_NONE, PAR_NOMASK)
+// MARK: packing one byte type
 
-#define par_pack_nan(p) \
-    _par_pack_type(p, PAR_ISA_NAN, PAR_A_NONE, PAR_NOMASK)
-
-#define par_pack_bool(p,attr) \
-    _par_pack_type(p, PAR_ISA_BOL, attr, PAR_MASK_BOL)
-
-#define par_pack_inf(p,attr) \
-    _par_pack_type(p, PAR_ISA_INF, attr, PAR_MASK_INF)
-
-#define par_pack_empty(p) \
-    _par_pack_type(p, PAR_ISA_EMP, PAR_A_NONE, PAR_NOMASK)
-
-#define par_pack_eos(p) \
-    _par_pack_type(p, PAR_ISA_EOS, PAR_A_NONE, PAR_NOMASK)
+#define _PAR_PACK_TYPE( p, allocf, type, attr, domain ) ({ \
+    par_type_t *_pval = _PAR_PACK_SLICE( p, allocf, PAR_TYPE_SIZE ); \
+    _par_pack_type_set( _pval, type, attr, domain ); \
+})
 
 
+// nil
+static inline int par_pack_nil( par_pack_t *p )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_increase, PAR_ISA_NIL, PAR_A_NONE, 
+                           PAR_NOMASK );
+}
 
-// packing integeral number
-#define _par_pack_bitint(p,bit,v,sign) do { \
-    par_type_t *pval = _par_pack_slice( p, PAR_TYPE##bit##_SIZE ); \
+// zero
+static inline int par_pack_zero( par_pack_t *p )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_increase, PAR_ISA_I0, PAR_A_NONE, 
+                           PAR_NOMASK );
+}
+
+// nan
+static inline int par_pack_nan( par_pack_t *p )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_increase, PAR_ISA_NAN, PAR_A_NONE, 
+                           PAR_NOMASK );
+}
+
+// bool
+static inline int par_pack_bool( par_pack_t *p, uint8_t bol )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_increase, PAR_ISA_BOL, bol, 
+                           PAR_MASK_BOL );
+}
+
+// infinity
+static inline int par_pack_inf( par_pack_t *p, uint8_t val )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_increase, PAR_ISA_INF, val, 
+                           PAR_MASK_INF );
+}
+
+// empty array/map
+static inline int par_pack_empty( par_pack_t *p )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_increase, PAR_ISA_EMP, PAR_A_NONE, 
+                           PAR_NOMASK );
+}
+
+
+// stream
+// nil
+static inline int par_spack_nil( par_spack_t *p )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_reduce, PAR_ISA_NIL, PAR_A_NONE, 
+                           PAR_NOMASK );
+}
+
+// zero
+static inline int par_spack_zero( par_spack_t *p )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_reduce, PAR_ISA_I0, PAR_A_NONE, 
+                           PAR_NOMASK );
+}
+
+// nan
+static inline int par_spack_nan( par_spack_t *p )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_reduce, PAR_ISA_NAN, PAR_A_NONE, 
+                           PAR_NOMASK );
+}
+
+// bool
+static inline int par_spack_bool( par_spack_t *p, uint8_t bol )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_reduce, PAR_ISA_BOL, bol, 
+                           PAR_MASK_BOL );
+}
+
+// infinity
+static inline int par_spack_inf( par_spack_t *p, uint8_t val )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_reduce, PAR_ISA_INF, val, 
+                           PAR_MASK_INF );
+}
+
+// empty array/map
+static inline int par_spack_empty( par_spack_t *p )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_reduce, PAR_ISA_EMP, PAR_A_NONE, 
+                           PAR_NOMASK );
+}
+
+// array
+static inline int par_spack_arr( par_spack_t *p )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_reduce, PAR_ISA_ARR, PAR_A_STREAM, 
+                           PAR_A_STREAM );
+}
+
+// map
+static inline int par_spack_map( par_spack_t *p )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_reduce, PAR_ISA_MAP, PAR_A_STREAM, 
+                           PAR_A_STREAM );
+}
+
+// eos
+static inline int par_spack_eos( par_spack_t *p )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_reduce, PAR_ISA_EOS, PAR_A_NONE, 
+                           PAR_NOMASK );
+}
+
+
+// MARK: undef _PAR_PACK_TYPE
+#undef _PAR_PACK_TYPE
+
+
+
+// MARK: packing integeral number
+
+#define _PAR_PACK_BITINT( p, allocf, bit, v, sign ) do { \
+    par_type_t *pval = _PAR_PACK_SLICE( p, allocf, PAR_TYPE##bit##_SIZE ); \
     pval->isa = PAR_ISA_I##bit | p->endian | sign; \
     *((uint_fast##bit##_t*)(pval+PAR_TYPE_SIZE)) = (uint_fast##bit##_t)v; \
 }while(0)
 
 
 // positive integer
+#define _PAR_PACK_UINT( p, allocf, num ) do { \
+    if( num <= UINT8_MAX ){ \
+        _PAR_PACK_BITINT( p, allocf, 8, num, PAR_A_UNSIGN ); \
+    } \
+    else if( num <= UINT16_MAX ){ \
+        _PAR_PACK_BITINT( p, allocf, 16, num, PAR_A_UNSIGN ); \
+    } \
+    else if( num <= UINT32_MAX ){ \
+        _PAR_PACK_BITINT( p, allocf, 32, num, PAR_A_UNSIGN ); \
+    } \
+    else { \
+        _PAR_PACK_BITINT( p, allocf, 64, num, PAR_A_UNSIGN ); \
+    } \
+}while(0)
+
+
 static inline int par_pack_uint( par_pack_t *p, uint_fast64_t num )
 {
-    if( num <= UINT8_MAX ){
-        _par_pack_bitint( p, 8, num, PAR_A_UNSIGN );
-    }
-    else if( num <= UINT16_MAX ){
-        _par_pack_bitint( p, 16, num, PAR_A_UNSIGN );
-    }
-    else if( num <= UINT32_MAX ){
-        _par_pack_bitint( p, 32, num, PAR_A_UNSIGN );
-    }
-    else {
-        _par_pack_bitint( p, 64, num, PAR_A_UNSIGN );
-    }
-    
+    _PAR_PACK_UINT( p, _par_pack_increase, num );
     return 0;
 }
+
+static inline int par_spack_uint( par_spack_t *p, uint_fast64_t num )
+{
+    _PAR_PACK_UINT( p, _par_pack_reduce, num );
+    return 0;
+}
+
+
+// MARK: undef _PAR_PACK_UINT
+#undef _PAR_PACK_UINT
+
 
 
 // negative integer
+#define _PAR_PACK_INT( p, allocf, num ) do { \
+    if( num >= INT8_MIN ){ \
+        _PAR_PACK_BITINT( p, allocf, 8, num, PAR_A_SIGNED ); \
+    } \
+    else if( num >= INT16_MIN ){ \
+        _PAR_PACK_BITINT( p, allocf, 16, num, PAR_A_SIGNED ); \
+    } \
+    else if( num >= INT32_MIN ){ \
+        _PAR_PACK_BITINT( p, allocf, 32, num, PAR_A_SIGNED ); \
+    } \
+    else { \
+        _PAR_PACK_BITINT( p, allocf, 64, num, PAR_A_SIGNED ); \
+    } \
+}while(0)
+
+
 static inline int par_pack_int( par_pack_t *p, int_fast64_t num )
 {
-    if( num >= INT8_MIN ){
-        _par_pack_bitint( p, 8, num, PAR_A_SIGNED );
-    }
-    else if( num >= INT16_MIN ){
-        _par_pack_bitint( p, 16, num, PAR_A_SIGNED );
-    }
-    else if( num >= INT32_MIN ){
-        _par_pack_bitint( p, 32, num, PAR_A_SIGNED );
-    }
-    else {
-        _par_pack_bitint( p, 64, num, PAR_A_SIGNED );
-    }
-    
+    _PAR_PACK_INT( p, _par_pack_increase, num );
+    return 0;
+}
+
+static inline int par_spack_int( par_spack_t *p, int_fast64_t num )
+{
+    _PAR_PACK_INT( p, _par_pack_reduce, num );
     return 0;
 }
 
 
-// packing floating-point number
-#define _par_pack_bitfloat(p,bit,v,sign) do { \
-    par_type_t *pval = _par_pack_slice( p, PAR_TYPE##bit##_SIZE ); \
+// MARK: undef _PAR_PACK_INT
+#undef _PAR_PACK_INT
+// MARK: undef _PAR_PACK_BITINT
+#undef _PAR_PACK_BITINT
+
+
+
+// MARK: packing floating-point number
+
+#define _PAR_PACK_BITFLOAT( p, allocf, bit, v ) do { \
+    uint_fast8_t sign = !!signbit( v ); \
+    par_type_t *pval = _PAR_PACK_SLICE( p, allocf, PAR_TYPE##bit##_SIZE ); \
     pval->isa = PAR_ISA_F##bit | p->endian | (sign); \
     *((par_float##bit##_t*)(pval+PAR_TYPE_SIZE)) = (par_float##bit##_t)(v); \
 }while(0)
 
-
 static inline int par_pack_float32( par_pack_t *p, float num )
 {
-    uint_fast8_t sign = !!signbit( num );
-    _par_pack_bitfloat( p, 32, num, sign );
+    _PAR_PACK_BITFLOAT( p, _par_pack_increase, 32, num );
     return 0;
 }
 
 static inline int par_pack_float64( par_pack_t *p, double num )
 {
-    uint_fast8_t sign = !!signbit( num );
-    _par_pack_bitfloat( p, 64, num, sign );
+    _PAR_PACK_BITFLOAT( p, _par_pack_increase, 64, num );
     return 0;
 }
+
+static inline int par_spack_float32( par_spack_t *p, float num )
+{
+    _PAR_PACK_BITFLOAT( p, _par_pack_reduce, 32, num );
+    return 0;
+}
+
+static inline int par_spack_float64( par_spack_t *p, double num )
+{
+    _PAR_PACK_BITFLOAT( p, _par_pack_reduce, 64, num );
+    return 0;
+}
+
+// MARK: undef _PAR_PACK_BITFLOAT
+#undef _PAR_PACK_BITFLOAT
+
+
+
+// MARK: packing type with length value
+#define _PAR_PACK_TYPE_WITH_NBITLEN( p, ptr, allocf, type, len, bit, ex ) do { \
+    par_type_t *pval = _PAR_PACK_SLICE( p, allocf, PAR_TYPE##bit##_SIZE + ex ); \
+    pval->isa = (type) | PAR_A_BIT##bit; \
+    *(uint_fast##bit##_t*)(pval+PAR_TYPE_SIZE) = (uint_fast##bit##_t)len; \
+    *(ptr) = (void*)(pval + PAR_TYPE##bit##_SIZE); \
+}while(0)
+
+#define _PAR_PACK_TYPE_WITH_LEN_EX( p, ptr, allocf, type, len, ex ) do { \
+    /* 64bit */ \
+    if( len & 0xFFFFFFFF00000000 ){ \
+        _PAR_PACK_TYPE_WITH_NBITLEN( p, ptr, allocf, type, len, 64, ex ); \
+    } \
+    /* 32bit */ \
+    else if( len & 0xFFFF0000 ){ \
+        _PAR_PACK_TYPE_WITH_NBITLEN( p, ptr, allocf, type, len, 32, ex ); \
+    } \
+    /* 16bit */ \
+    else if( len & 0xFF00 ){ \
+        _PAR_PACK_TYPE_WITH_NBITLEN( p, ptr, allocf, type, len, 16, ex ); \
+    } \
+    /* 8bit */ \
+    else { \
+        _PAR_PACK_TYPE_WITH_NBITLEN( p, ptr, allocf, type, len, 8, ex ); \
+    } \
+}while(0)
+
+
+
+#define _PAR_PACK_TYPE_WITH_LEN( p, allocf, type, len ) do { \
+    void *_unused = NULL; \
+    _PAR_PACK_TYPE_WITH_LEN_EX( p, &_unused, allocf, type, len, 0 ); \
+}while(0)
+
+
+// MARK: packing raw/string/ref
+
+#define _PAR_PACK_BYTEA( p, allocf, type, val, len ) do { \
+    void *dest = NULL; \
+    /* allocate extra bytes space */ \
+    _PAR_PACK_TYPE_WITH_LEN_EX( p, &dest, allocf, type, len, len ); \
+    /* copy val */ \
+    memcpy( dest, val, len ); \
+}while(0)
+
+
+static inline int par_pack_str( par_pack_t *p, void *val, size_t len )
+{
+    _PAR_PACK_BYTEA( p, _par_pack_increase, PAR_ISA_STR|p->endian, val, len );
+    return 0;
+}
+
+// MARK: undef _PAR_PACK_BYTEA
+#undef _PAR_PACK_BYTEA
+
+
+#define _PAR_SPACK_BYTEA( p, val, len ) do { \
+    size_t remain = p->blksize - p->cur; \
+    /* copy to memory block if have space */ \
+    if( remain >= len ){ \
+COPY2BLOCK: \
+        memcpy( p->mem + p->cur, val, len ); \
+        p->cur += len; \
+    } \
+    else \
+    { \
+        /* copy remaining bytes */ \
+        if( remain ){ \
+            memcpy( p->mem + p->cur, val, remain ); \
+            p->cur += remain; \
+            val += remain; \
+        } \
+        /* reduce memory */ \
+        if( p->reducer( p->mem, p->cur, p->udata ) == 0 ) \
+        { \
+            /* rewind cursor */ \
+            p->cur = 0; \
+            len -= remain; \
+            /* copy to memory block if have space */ \
+            if( len < p->blksize ){ \
+                goto COPY2BLOCK; \
+            } \
+            /* reduce all */ \
+            else if( p->reducer( val, len, p->udata ) != 0 ){ \
+                return -1; \
+            } \
+        } \
+    } \
+}while(0)
+
+
+static inline int par_spack_str( par_spack_t *p, void *val, size_t len )
+{
+    _PAR_PACK_TYPE_WITH_LEN( p, _par_pack_reduce, PAR_ISA_STR|p->endian, len );
+    _PAR_SPACK_BYTEA( p, val, len );
+    return 0;
+}
+
+// MARK: undef _PAR_SPACK_BYTEA
+#undef _PAR_SPACK_BYTEA
 
 
 // array/map
 static inline int _par_pack_typex( par_pack_t *p, uint8_t isa, size_t len )
 {
-    if( !p->reducer )
-    {
-        par_type_t *pval = NULL;
-        
-        // 64bit
-        if( len & 0xFFFFFFFF00000000 ){
-            pval = _par_pack_slice( p, PAR_TYPE64_SIZE );
-            pval->isa = isa | PAR_A_BIT64;
-            *(uint_fast64_t*)(pval+PAR_TYPE_SIZE) = (uint_fast64_t)len;
-        }
-        // 32bit
-        else if( len & 0xFFFF0000 ){
-            pval = _par_pack_slice( p, PAR_TYPE32_SIZE );
-            pval->isa = isa | PAR_A_BIT32;
-            *(uint_fast32_t*)(pval+PAR_TYPE_SIZE) = (uint_fast32_t)len;
-        }
-        // 16bit
-        else if( len & 0xFF00 ){
-            pval = _par_pack_slice( p, PAR_TYPE16_SIZE );
-            pval->isa = isa | PAR_A_BIT16;
-            *(uint_fast16_t*)(pval+PAR_TYPE_SIZE) = (uint_fast16_t)len;
-        }
-        // 8bit
-        else {
-            pval = _par_pack_slice( p, PAR_TYPE8_SIZE );
-            pval->isa = isa | PAR_A_BIT8;
-            *(uint_fast8_t*)(pval+PAR_TYPE_SIZE) = (uint_fast8_t)len;
-        }
-        
-        return 0;
-    }
-    
-    return _par_pack_type( p, isa, PAR_A_STREAM, PAR_A_STREAM );
+    _PAR_PACK_TYPE_WITH_LEN( p, _par_pack_increase, isa, len );
+    return 0;
 }
 
 #define par_pack_arr(p,len)    _par_pack_typex(p,PAR_ISA_ARR,len)
 #define par_pack_map(p,len)    _par_pack_typex(p,PAR_ISA_MAP,len)
 
+// MARK: undef _PAR_PACK_TYPE_WITH_LEN
+#undef _PAR_PACK_TYPE_WITH_LEN
+// MARK: undef _PAR_PACK_TYPE_WITH_LEN_EX
+#undef _PAR_PACK_TYPE_WITH_LEN_EX
+// MARK: undef _PAR_PACK_TYPE_WITH_NBITLEN
+#undef _PAR_PACK_TYPE_WITH_NBITLEN
+
 
 static inline int _par_pack_typexidx( par_pack_t *p, uint8_t isa, uint8_t bit,
                                       size_t *idx )
 {
-    if( !p->reducer )
-    {
-        par_type_t *pval = NULL;
-        
-        if( bit & ~(PAR_MASK_BIT) ){
-            errno = PARCEL_EDOM;
-            return -1;
-        }
-        
-        *idx = p->cur;
-        pval = _par_pack_slice( p, PAR_TYPE_SIZE + _par_bit2byte( bit ) );
-        pval->isa = isa | bit;
-
-        return 0;
+    par_type_t *pval = NULL;
+    
+    if( bit & ~(PAR_MASK_BIT) ){
+        errno = PARCEL_EDOM;
+        return -1;
     }
     
-    return _par_pack_type( p, isa, PAR_A_STREAM, PAR_A_STREAM );
+    *idx = p->cur;
+    pval = _PAR_PACK_SLICE( p, _par_pack_increase, 
+                            PAR_TYPE_SIZE + _par_bit2byte( bit ) );
+    pval->isa = isa | bit;
+
+    return 0;
 }
 
 #define par_pack_arridx(p,bit,idx) _par_pack_typexidx(p,PAR_ISA_ARR,bit,idx)
 #define par_pack_mapidx(p,bit,idx) _par_pack_typexidx(p,PAR_ISA_MAP,bit,idx)
 
+// MARK: undef _PAR_PACK_SLICE
+#undef _PAR_PACK_SLICE
+
+
 
 static inline int par_pack_tbllen( par_pack_t *p, size_t idx, size_t len )
 {
-    // append eos
-    if( p->reducer ){
-        return par_pack_eos( p );
-    }
     // overflow
-    else if( idx > p->cur ){
+    if( idx > p->cur ){
         errno = PARCEL_EDOM;
         return -1;
     }
@@ -797,79 +1041,6 @@ static inline int par_pack_tbllen( par_pack_t *p, size_t idx, size_t len )
     return -1;
 }
 
-
-static inline int par_pack_str( par_pack_t *p, void *val, size_t len )
-{
-    par_type_t *pval = NULL;
-    
-    // check val size
-    // 64bit
-    if( len & 0xFFFFFFFF00000000 ){
-        pval = _par_pack_slice( p, PAR_TYPE64_SIZE );
-        *(uint_fast64_t*)(pval+PAR_TYPE_SIZE) = (uint_fast64_t)len;
-        pval->isa = PAR_ISA_STR | p->endian | PAR_A_BIT64;
-    }
-    // 32bit
-    else if( len & 0xFFFF0000 ){
-        pval = _par_pack_slice( p, PAR_TYPE32_SIZE );
-        *(uint_fast32_t*)(pval+PAR_TYPE_SIZE) = (uint_fast32_t)len;
-        pval->isa = PAR_ISA_STR | p->endian | PAR_A_BIT32;
-    }
-    // 16bit
-    else if( len & 0xFF00 ){
-        pval = _par_pack_slice( p, PAR_TYPE16_SIZE );
-        *(uint_fast16_t*)(pval+PAR_TYPE_SIZE) = (uint_fast16_t)len;
-        pval->isa = PAR_ISA_STR | p->endian | PAR_A_BIT16;
-    }
-    // 8bit
-    else {
-        pval = _par_pack_slice( p, PAR_TYPE8_SIZE );
-        *(uint_fast8_t*)(pval+PAR_TYPE_SIZE) = (uint_fast8_t)len;
-        pval->isa = PAR_ISA_STR | p->endian | PAR_A_BIT8;
-    }
-    
-    if( p->reducer )
-    {
-        size_t remain = p->blksize - p->cur;
-        
-        // copy to memory block if have space
-        if( remain >= len ){
-COPY2BLOCK:
-            memcpy( p->mem + p->cur, val, len );
-            p->cur += len;
-            return 0;
-        }
-        
-        // no-space
-        memcpy( p->mem + p->cur, val, remain );
-        p->cur += remain;
-        val += remain;
-        // reduce memory
-        if( p->reducer( p->mem, p->cur, p->udata ) == 0 )
-        {
-            // rewind cursor
-            p->cur = 0;
-            len -= remain;
-            // copy to memory block if have space
-            if( len < p->blksize ){
-                goto COPY2BLOCK;
-            }
-            // reduce 
-            else if( p->reducer( val, len, p->udata ) == 0 ){
-                return 0;
-            }
-        }
-        
-        return -1;
-    }
-    // allocate extra bytes space
-    else {
-        void *dest = _par_pack_slice( p, len );
-        memcpy( dest, val, len );
-    }
-    
-    return 0;
-}
 
 
 // MARK: unpacking
