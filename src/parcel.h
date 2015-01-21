@@ -185,11 +185,10 @@ enum {
     // -----------------+----+
     // type             |attr
     // -----------------+----+
-    // PAR_ISA_EMP 00101|X00
+    // PAR_ISA_EMP 00101|000
     // -----------------+----+
-    // PAR_ISA_EOS 00110|X00
+    // PAR_ISA_EOS 00110|000
     // -----------------+----+
-    // X: 0 = PAR_A_LENDIAN, 1 = PAR_A_BENDIAN
     //
     PAR_ISA_EMP = 0x28, // empty table
     PAR_ISA_EOS = 0x30, // end-of-stream
@@ -214,7 +213,8 @@ enum {
     // PAR_ISA_F64 01100|X0Y
     // -----------------+----+
     //
-    // XYY: endianess and signedness
+    // X: endianess
+    // Y: signedness
     // ---------------+---------------+
     //               X|Y
     // ---------------+---------------+
@@ -321,7 +321,7 @@ enum {
     // -----------------+----+
     // type             |attr
     // -----------------+----+
-    // PAR_ISA_RAW 10000|XYY
+    // PAR_ISA_RAW 10000|0YY
     // -----------------+----+
     // PAR_ISA_STR 10001|XYY
     // -----------------+----+
