@@ -738,6 +738,7 @@ static inline int par_pack_tbllen( par_pack_t *p, size_t idx, size_t len )
     if( p->reducer ){
         return par_pack_eos( p );
     }
+    // overflow
     else if( idx > p->cur ){
         errno = PARCEL_EDOM;
         return -1;
@@ -759,7 +760,8 @@ static inline int par_pack_tbllen( par_pack_t *p, size_t idx, size_t len )
                 {
                     uint_fast8_t bit = pval->isa & PAR_MASK_BIT;
                     
-                    if( ( idx + _par_bit2byte( bit ) ) > p->cur ){
+                    // overflow
+                    if( _par_bit2byte( bit ) > ( p->cur - idx ) ){
                         errno = PARCEL_EDOM;
                         return -1;
                     }
