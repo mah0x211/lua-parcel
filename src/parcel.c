@@ -321,7 +321,7 @@ static int spack_val( par_spack_t *p, lua_State *L, int idx )
             }
         break;
         case LUA_TSTRING:
-            if( par_spack_map( p ) != 0 ){
+            if( par_spack_smp( p ) != 0 ){
                 return -1;
             }
         break;
