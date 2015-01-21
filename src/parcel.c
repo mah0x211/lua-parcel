@@ -150,12 +150,12 @@ static int pack_val( par_pack_t *p, lua_State *L, int idx )
     ktype = lua_type( L, -2 );
     switch( ktype ){
         case LUA_TNUMBER:
-            if( par_pack_arr( p, &vidx ) != 0 ){
+            if( par_pack_arridx( p, PAR_A_BIT64, &vidx ) != 0 ){
                 return -1;
             }
         break;
         case LUA_TSTRING:
-            if( par_pack_map( p, &vidx ) != 0 ){
+            if( par_pack_mapidx( p, PAR_A_BIT64, &vidx ) != 0 ){
                 return -1;
             }
         break;

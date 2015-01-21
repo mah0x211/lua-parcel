@@ -706,6 +706,32 @@ static inline int _par_pack_typex( par_pack_t *p, uint8_t isa, size_t len )
 #define par_pack_map(p,len)    _par_pack_typex(p,PAR_ISA_MAP,len)
 
 
+static inline int _par_pack_typexidx( par_pack_t *p, uint8_t isa, uint8_t bit,
+                                      size_t *idx )
+{
+    if( !p->reducer )
+    {
+        par_type_t *pval = NULL;
+        
+        if( bit & ~(PAR_MASK_BIT) ){
+            errno = PARCEL_EDOM;
+            return -1;
+        }
+        
+        *idx = p->cur;
+        pval = _par_pack_slice( p, PAR_TYPE_SIZE + _par_bit2byte( bit ) );
+        pval->isa = isa | bit;
+
+        return 0;
+    }
+    
+    return _par_pack_type( p, isa, PAR_A_STREAM, PAR_A_STREAM );
+}
+
+#define par_pack_arridx(p,bit,idx) _par_pack_typexidx(p,PAR_ISA_ARR,bit,idx)
+#define par_pack_mapidx(p,bit,idx) _par_pack_typexidx(p,PAR_ISA_MAP,bit,idx)
+
+
 static inline int par_pack_tbllen( par_pack_t *p, size_t idx, size_t len )
 {
     // append eos
