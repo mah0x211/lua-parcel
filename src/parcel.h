@@ -639,6 +639,20 @@ static inline int par_pack_empty( par_pack_t *p )
                            PAR_NOMASK );
 }
 
+// stream array
+static inline int par_pack_sarray( par_pack_t *p )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_increase, PAR_ISA_SAR, PAR_A_NONE, 
+                           PAR_NOMASK );
+}
+
+// stream map
+static inline int par_pack_smap( par_pack_t *p )
+{
+    return _PAR_PACK_TYPE( p, _par_pack_increase, PAR_ISA_SMP, PAR_A_NONE, 
+                           PAR_NOMASK );
+}
+
 
 // stream
 // nil
