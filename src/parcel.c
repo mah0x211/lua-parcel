@@ -397,8 +397,12 @@ static int pack_reduce_lua( lua_State *L )
         int rv = 0;
         
         // check blksize
-        if( blksize < 0 ){
-            blksize = 0;
+        if( lua_gettop( L ) > 2 )
+        {
+            if( ( blksize = luaL_optinteger( L, 3, 0 ) ) < 0 ){
+                blksize = 0;
+            }
+            lua_settop( L, 2 );
         }
         // check reduce function
         luaL_checktype( L, 2, LUA_TFUNCTION );
