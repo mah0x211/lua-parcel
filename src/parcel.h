@@ -431,15 +431,6 @@ static inline size_t _par_align_blksize( size_t blksize )
 #undef PAR_DEFAULT_BLK_SIZE
 
 
-// check available block space
-#define _PAR_CHECK_BLKSPC( blksize, cur, req ) do { \
-    if( (cur) >= (blksize) || ( (blksize) - (cur) ) < (req) ){ \
-        errno = PARCEL_ENOBLKS; \
-        return -1; \
-    } \
-}while(0)
-
-
 
 // MARK: packing
 
@@ -1175,6 +1166,15 @@ typedef struct {
 } par_unpack_t;
 
 
+// check available block space
+#define _PAR_CHECK_BLKSPC( blksize, cur, req ) do { \
+    if( (cur) >= (blksize) || ( (blksize) - (cur) ) < (req) ){ \
+        errno = PARCEL_ENOBLKS; \
+        return -1; \
+    } \
+}while(0)
+
+
 typedef struct {
     uint_fast8_t isa;
     uint_fast8_t endian;
@@ -1395,6 +1395,8 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
 }
 
 
+// MARK: undef _PAR_CHECK_BLKSPC
+#undef _PAR_CHECK_BLKSPC
 // MARK: undef _PAR_BSWAP8
 #undef _PAR_BSWAP8
 // MARK: undef _PAR_BSWAP16
@@ -1419,6 +1421,5 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
 #undef _PAR_VERIFY_ATTR
 // MARK: undef _PAR_BIT2BYTE
 #undef _PAR_BIT2BYTE
-
 
 #endif
