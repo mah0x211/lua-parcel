@@ -969,6 +969,18 @@ static inline int par_pack_map( par_pack_t *p, size_t len )
     return 0;
 }
 
+static inline int par_spack_array( par_spack_t *p, size_t len )
+{
+    _PAR_PACK_TYPE_WITH_LEN( p, _par_pack_reduce, PAR_ISA_ARR|p->endian, len );
+    return 0;
+}
+
+static inline int par_spack_map( par_spack_t *p, size_t len )
+{
+    _PAR_PACK_TYPE_WITH_LEN( p, _par_pack_reduce, PAR_ISA_MAP|p->endian, len );
+    return 0;
+}
+
 
 // reference
 static inline int par_pack_ref( par_pack_t *p, size_t idx )
