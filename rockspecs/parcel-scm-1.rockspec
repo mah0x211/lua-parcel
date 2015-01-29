@@ -16,7 +16,10 @@ build = {
     type = "builtin",
     modules = {
         parcel = {
-            sources = { "src/parcel.c" }
+            sources = { 
+                "src/pack.c",
+                "src/unpack.c",
+            }
         }
     }
 }
