@@ -412,34 +412,16 @@ typedef union {
     uint_fast8_t isa;
 } par_type_t;
 
-typedef uint_fast64_t par_typelen_t;
-
-// partype_t + uint_fast8_t
-typedef union {
-    uint_fast8_t size[2];
-} par_type8_t;
-
-// partype_t + uint_fast16_t
-typedef union {
-    uint_fast8_t size[3];
-} par_type16_t;
-
-// partype_t + uint_fast32_t
-typedef union {
-    uint_fast8_t size[5];
-} par_type32_t;
-
-// partype_t + uint_fast64_t
-typedef union {
-    uint_fast8_t size[9];
-} par_type64_t;
-
-// par_type[8-64]_t size
-#define PAR_TYPE_SIZE       sizeof(par_type_t)
-#define PAR_TYPE8_SIZE      sizeof(par_type8_t)
-#define PAR_TYPE16_SIZE     sizeof(par_type16_t)
-#define PAR_TYPE32_SIZE     sizeof(par_type32_t)
-#define PAR_TYPE64_SIZE     sizeof(par_type64_t)
+// partype_t
+#define PAR_TYPE_SIZE   1
+// partype_t + 8 bit value
+#define PAR_TYPE8_SIZE  2
+// partype_t + 16 bit value
+#define PAR_TYPE16_SIZE 3
+// partype_t + 32 bit value
+#define PAR_TYPE32_SIZE 5
+// partype_t + 64 bit value
+#define PAR_TYPE64_SIZE 9
 
 
 // MARK: endianness
