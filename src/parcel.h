@@ -436,22 +436,23 @@ static inline uint8_t par_get_endian( void )
 
 // MARK: memory block size
 
-#define PAR_DEFAULT_BLK_SIZE    1024
+#define PAR_DEFAULT_BLKSIZE     1024
+#define PAR_BLKSIZE_ALIGNMENT   16
 
 static inline size_t _par_align_blksize( size_t blksize )
 {
     if( !blksize ){
-        return PAR_DEFAULT_BLK_SIZE;
+        return PAR_BLKSIZE_ALIGNMENT;
     }
-    else if( blksize < 16 ){
-        return 16;
+    else if( blksize < PAR_BLKSIZE_ALIGNMENT ){
+        return PAR_BLKSIZE_ALIGNMENT;
     }
     
-    return blksize / 16 * 16;
+    return blksize / PAR_BLKSIZE_ALIGNMENT * PAR_BLKSIZE_ALIGNMENT;
 }
 
-#undef PAR_DEFAULT_BLK_SIZE
-
+#undef PAR_DEFAULT_BLKSIZE
+#undef PAR_BLKSIZE_ALIGNMENT
 
 
 // MARK: packing
