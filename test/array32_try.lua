@@ -14,7 +14,7 @@ local function genArray( len )
 end
 
 -- 32 bit length array
--- 8bit type(0x95) + 32bit length value + N sint6 value
+-- 8bit type(0x96) + 32bit length value + N sint6 value
 for _, i in ipairs({
     65536, 
     -- lua cannot be handled more than 1<<MAXBITS(26) length array
