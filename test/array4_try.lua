@@ -27,5 +27,5 @@ end
 -- len > 15
 v = genArray( 16 );
 bin = ifNil( pack( v ) );
--- 8bit type(0x98) + 8 bit length value + N sint6 value
+-- 8bit type(0x94) + 8 bit length value + N sint6 value
 ifNotEqual( #bin, 2 + #v * 1 );
