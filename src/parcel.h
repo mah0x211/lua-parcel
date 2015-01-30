@@ -625,7 +625,7 @@ static inline int _par_pack_type_set( par_type_t *pval, uint8_t type,
 }while(0)
 
 
-// nil
+// MARK: nil
 static inline int par_pack_nil( par_pack_t *p )
 {
     _PAR_PACK_TYPE( p, _par_pack_increase, PAR_ISA_NIL );
@@ -639,7 +639,7 @@ static inline int par_spack_nil( par_spack_t *p )
 }
 
 
-// zero
+// MARK: zero
 static inline int par_pack_zero( par_pack_t *p )
 {
     _PAR_PACK_TYPE( p, _par_pack_increase, 0 );
@@ -652,7 +652,7 @@ static inline int par_spack_zero( par_spack_t *p )
 }
 
 
-// nan
+// MARK: NaN
 static inline int par_pack_nan( par_pack_t *p )
 {
     _PAR_PACK_TYPE( p, _par_pack_increase, PAR_ISA_NAN );
@@ -665,7 +665,7 @@ static inline int par_spack_nan( par_spack_t *p )
     return PARCEL_OK;
 }
 
-// stream array
+// MARK: stream array
 static inline int par_pack_sarray( par_pack_t *p )
 {
     _PAR_PACK_TYPE( p, _par_pack_increase, PAR_ISA_SARR );
@@ -678,7 +678,7 @@ static inline int par_spack_sarray( par_spack_t *p )
     return PARCEL_OK;
 }
 
-// stream map
+// MARK: stream map
 static inline int par_pack_smap( par_pack_t *p )
 {
     _PAR_PACK_TYPE( p, _par_pack_increase, PAR_ISA_SMAP );
@@ -692,7 +692,7 @@ static inline int par_spack_smap( par_spack_t *p )
 }
 
 
-// eos
+// MARK: eos
 static inline int par_pack_eos( par_pack_t *p )
 {
     _PAR_PACK_TYPE( p, _par_pack_increase, PAR_ISA_EOS );
@@ -706,7 +706,7 @@ static inline int par_spack_eos( par_spack_t *p )
 }
 
 
-// boolean
+// MARK: boolean
 static inline int par_pack_bool( par_pack_t *p, uint8_t bol )
 {
     _PAR_PACK_TYPE( p, _par_pack_increase, PAR_ISA_TRUE + !bol );
@@ -720,7 +720,7 @@ static inline int par_spack_bool( par_spack_t *p, uint8_t bol )
 }
 
 
-// infinity
+// MARK: infinity
 static inline int par_pack_inf( par_pack_t *p, double num )
 {
     _PAR_PACK_TYPE( p, _par_pack_increase, PAR_ISA_NINF + !signbit( num ) );
@@ -734,7 +734,7 @@ static inline int par_spack_inf( par_spack_t *p, double num )
 }
 
 
-// MARK: packing integeral number
+// MARK: integeral number
 #define _PAR_PACK_NBIT_VAL_EX( p, ptr, allocf, type, bit, v, ex ) do { \
     par_type_t *_pval = _PAR_PACK_SLICE(p, allocf, PAR_TYPE##bit##_SIZE+(ex)); \
     void *_val = (void*)(_pval+PAR_TYPE_SIZE); \
@@ -752,7 +752,7 @@ static inline int par_spack_inf( par_spack_t *p, double num )
 }while(0)
 
 
-// MARK: packing floating-point number
+// MARK: float32
 static inline int par_pack_float32( par_pack_t *p, float num )
 {
     _PAR_PACK_NBIT_VAL( p, _par_pack_increase, PAR_ISA_F, 32, num );
@@ -764,6 +764,7 @@ static inline int par_spack_float32( par_spack_t *p, float num )
     return PARCEL_OK;
 }
 
+// MARK: float64
 static inline int par_pack_float64( par_pack_t *p, double num )
 {
     _PAR_PACK_NBIT_VAL( p, _par_pack_increase, PAR_ISA_F, 64, num );
@@ -776,7 +777,60 @@ static inline int par_spack_float64( par_spack_t *p, double num )
 }
 
 
-// positive integer
+// MARK: uint8
+static inline int par_pack_uint8( par_pack_t *p, uint_fast8_t num )
+{
+    _PAR_PACK_NBIT_VAL( p, _par_pack_increase, PAR_ISA_U, 8, num );
+    return PARCEL_OK;
+}
+
+static inline int par_spack_uint8( par_spack_t *p, uint_fast8_t num )
+{
+    _PAR_PACK_NBIT_VAL( p, _par_pack_reduce, PAR_ISA_U, 8, num );
+    return PARCEL_OK;
+}
+
+// MARK: uint16
+static inline int par_pack_uint16( par_pack_t *p, uint_fast16_t num )
+{
+    _PAR_PACK_NBIT_VAL( p, _par_pack_increase, PAR_ISA_U, 16, num );
+    return PARCEL_OK;
+}
+
+static inline int par_spack_uint16( par_spack_t *p, uint_fast16_t num )
+{
+    _PAR_PACK_NBIT_VAL( p, _par_pack_reduce, PAR_ISA_U, 16, num );
+    return PARCEL_OK;
+}
+
+// MARK: uint32
+static inline int par_pack_uint32( par_pack_t *p, uint_fast32_t num )
+{
+    _PAR_PACK_NBIT_VAL( p, _par_pack_increase, PAR_ISA_U, 32, num );
+    return PARCEL_OK;
+}
+
+static inline int par_spack_uint32( par_spack_t *p, uint_fast32_t num )
+{
+    _PAR_PACK_NBIT_VAL( p, _par_pack_reduce, PAR_ISA_U, 32, num );
+    return PARCEL_OK;
+}
+
+// MARK: uint64
+static inline int par_pack_uint64( par_pack_t *p, uint_fast64_t num )
+{
+    _PAR_PACK_NBIT_VAL( p, _par_pack_increase, PAR_ISA_U, 64, num );
+    return PARCEL_OK;
+}
+
+static inline int par_spack_uint64( par_spack_t *p, uint_fast64_t num )
+{
+    _PAR_PACK_NBIT_VAL( p, _par_pack_reduce, PAR_ISA_U, 64, num );
+    return PARCEL_OK;
+}
+
+
+// MARK: unsigned integer
 #define _PAR_PACK_UINT( p, allocf, num ) do { \
     if( (num) <= PAR_INT6_MAX ){ \
         _PAR_PACK_TYPE( p, allocf, (uint_fast8_t)num ); \
@@ -795,7 +849,6 @@ static inline int par_spack_float64( par_spack_t *p, double num )
     } \
 }while(0)
 
-
 static inline int par_pack_uint( par_pack_t *p, uint_fast64_t num )
 {
     _PAR_PACK_UINT( p, _par_pack_increase, num );
@@ -809,7 +862,7 @@ static inline int par_spack_uint( par_spack_t *p, uint_fast64_t num )
 }
 
 
-// idx
+// MARK: non-consecutive array index
 static inline int par_pack_idx( par_pack_t *p, uint_fast64_t idx )
 {
     _PAR_PACK_TYPE( p, _par_pack_increase, PAR_ISA_IDX );
@@ -822,12 +875,63 @@ static inline int par_spack_idx( par_spack_t *p, uint_fast64_t idx )
     return par_spack_uint( p, idx );
 }
 
-
 // MARK: undef _PAR_PACK_UINT
 #undef _PAR_PACK_UINT
 
 
-// negative integer
+// MARK: int8
+static inline int par_pack_int8( par_pack_t *p, int_fast8_t num )
+{
+    _PAR_PACK_NBIT_VAL( p, _par_pack_increase, PAR_ISA_S, 8, num );
+    return PARCEL_OK;
+}
+
+static inline int par_spack_int8( par_spack_t *p, int_fast8_t num )
+{
+    _PAR_PACK_NBIT_VAL( p, _par_pack_reduce, PAR_ISA_S, 8, num );
+    return PARCEL_OK;
+}
+
+// MARK: int16
+static inline int par_pack_int16( par_pack_t *p, int_fast16_t num )
+{
+    _PAR_PACK_NBIT_VAL( p, _par_pack_increase, PAR_ISA_S, 16, num );
+    return PARCEL_OK;
+}
+
+static inline int par_spack_int16( par_spack_t *p, int_fast16_t num )
+{
+    _PAR_PACK_NBIT_VAL( p, _par_pack_reduce, PAR_ISA_S, 16, num );
+    return PARCEL_OK;
+}
+
+// MARK: int32
+static inline int par_pack_int32( par_pack_t *p, int_fast32_t num )
+{
+    _PAR_PACK_NBIT_VAL( p, _par_pack_increase, PAR_ISA_S, 32, num );
+    return PARCEL_OK;
+}
+
+static inline int par_spack_int32( par_spack_t *p, int_fast32_t num )
+{
+    _PAR_PACK_NBIT_VAL( p, _par_pack_reduce, PAR_ISA_S, 32, num );
+    return PARCEL_OK;
+}
+
+// MARK: int64
+static inline int par_pack_int64( par_pack_t *p, int_fast64_t num )
+{
+    _PAR_PACK_NBIT_VAL( p, _par_pack_increase, PAR_ISA_S, 64, num );
+    return PARCEL_OK;
+}
+
+static inline int par_spack_int64( par_spack_t *p, int_fast64_t num )
+{
+    _PAR_PACK_NBIT_VAL( p, _par_pack_reduce, PAR_ISA_S, 64, num );
+    return PARCEL_OK;
+}
+
+// MARK: signed integer
 #define _PAR_PACK_INT( p, allocf, num ) do { \
     if( (num) > 0 ){ \
         if( (num) > INT32_MAX ){ \
@@ -912,7 +1016,7 @@ static inline int par_spack_int( par_spack_t *p, int_fast64_t num )
 }while(0)
 
 
-// MARK: packing array
+// MARK: array
 #define _PAR_PACK_ARRAY( p, allocf, type, len ) do { \
     if( len <= 0xF ){ \
         _PAR_PACK_TYPE( p, allocf, type##4|(uint_fast8_t)len ); \
@@ -936,7 +1040,7 @@ static inline int par_spack_array( par_spack_t *p, size_t len )
 }
 
 
-// MARK: packing map
+// MARK: map
 #define _PAR_PACK_MAP _PAR_PACK_ARRAY
 
 static inline int par_pack_map( par_pack_t *p, size_t len )
@@ -955,9 +1059,7 @@ static inline int par_spack_map( par_spack_t *p, size_t len )
 #undef _PAR_PACK_ARRAY
 
 
-
-// MARK: packing ref
-
+// MARK: reference
 static inline int par_pack_ref( par_pack_t *p, size_t idx )
 {
     if( idx < p->cur )
@@ -994,7 +1096,7 @@ static inline int par_spack_ref( par_spack_t *p, size_t idx )
 }
 
 
-// MARK: packing raw/string
+// MARK: raw/string
 #define _PAR_PACK_BYTEA( p, allocf, type, val, len ) do { \
     void *_dest = NULL; \
     /* allocate extra bytes space */ \
@@ -1037,6 +1139,7 @@ static inline int par_pack_str( par_pack_t *p, void *val, size_t len )
 #undef _PAR_PACK_BYTEA
 
 
+// MARK: stream raw/string
 #define _PAR_SPACK_BYTEA( p, val, len ) do { \
     size_t _remain = (p)->blksize - (p)->cur; \
     /* copy to memory block if have space */ \
