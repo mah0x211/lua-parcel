@@ -307,14 +307,11 @@ enum {
     // ----------------------+
     // for non-consecutive array
     //
-    //     N                                                              M+1
-    // ----+----------------+-----------------------+----------------+-----+
-    // ... | PAR_ISA_IDX(1) | serialized idx(M val) | serialized val | ... 
-    // ----+----------------+-----------------------+----------------+-----+
-    // NOTE: the serialized-idx value(M) must be type of unsigned integer and 
-    //       larger than number of N-objects.
-    //       array index number(N) of unpacking process must be initialized by 
-    //       serialized index value(M).
+    //     N
+    // ----+----------------+----------------+----------------+-----+
+    // ... | PAR_ISA_IDX(1) | serialized idx | serialized val | ... 
+    // ----+----------------+----------------+----------------+-----+
+    // NOTE: the serialized-idx value(M) must be type of unsigned integer.
     //
     PAR_ISA_IDX,    // non-consecutive array index
     
@@ -1207,6 +1204,7 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
         // init
         ext->isa = type->isa;
         ext->size.len = 0;
+        // 6 bit integer
         if( ext->isa <= PAR_ISA_S6N_TAIL )
         {
             // small negative integer
@@ -1221,7 +1219,7 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
             p->cur += PAR_TYPE_SIZE;
             return PARCEL_OK;
         }
-        // 7 bit integer
+        // others
         switch( ext->isa )
         {
             // 1 byte types
