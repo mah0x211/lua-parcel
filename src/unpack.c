@@ -28,8 +28,7 @@
 
 #include "lparcel.h"
 
-#define MODULE_MT       "parcel.unpack_tbl"
-#define MODULE_OO_MT    "parcel.unpack"
+#define MODULE_MT   "parcel.unpack"
 
 typedef struct {
     par_unpack_t p;
@@ -303,15 +302,16 @@ static int unpack_val( lua_State *L, par_unpack_t *p, par_extract_t *ext )
 static int unpack_lua( lua_State *L )
 {
     size_t len = 0;
-    const char *mem = (const char*)luaL_checklstring( L, 2, &len );
+    const char *mem = (const char*)luaL_checklstring( L, 1, &len );
     par_unpack_t p;
     par_extract_t ext;
     
     // init
     par_unpack_init( &p, (void*)mem, len );
+    lua_settop( L, 1 );
     // unpack
     if( unpack_val( L, &p, &ext ) != -1 ){
-        return lua_gettop( L ) - 2;
+        return lua_gettop( L ) - 1;
     }
     
     // got error
@@ -324,7 +324,7 @@ static int unpack_lua( lua_State *L )
 
 static int call_lua( lua_State *L )
 {
-    lunpack_t *l = luaL_checkudata( L, 1, MODULE_OO_MT );
+    lunpack_t *l = luaL_checkudata( L, 1, MODULE_MT );
     par_extract_t ext;
 
     // unpack
@@ -342,13 +342,15 @@ static int call_lua( lua_State *L )
 
 static int tostring_lua( lua_State *L )
 {
-    return lparcel_tostring( L, MODULE_OO_MT );
+    return lparcel_tostring( L, MODULE_MT );
 }
 
 
 static int gc_lua( lua_State *L )
 {
-    //lunpack_t *l = lua_touserdata( L, 1 );
+    lunpack_t *l = lua_touserdata( L, 1 );
+    
+    lstate_unref( L, l->ref );
     
     return 0;
 }
@@ -367,64 +369,42 @@ static int alloc_lua( lua_State *L, int ref, void *mem, size_t len )
     // init
     l->ref = ref;
     par_unpack_init( &l->p, (void*)mem, len );
-    luaL_getmetatable( L, MODULE_OO_MT );
+    luaL_getmetatable( L, MODULE_MT );
     lua_setmetatable( L, -2 );
     
     return 1;
 }
 
 
-static int index_lua( lua_State *L )
-{
-    lunpack_t *l = luaL_checkudata( L, 1, MODULE_OO_MT );
-    
-    printf("key: %s\n", lua_typename( L, lua_type( L, 2 ) ) );
-    switch( lua_type( L, 2 ) ){
-        case LUA_TNUMBER:
-        break;
-        case LUA_TSTRING:
-        break;
-    }
-    
-    return 0;
-}
-
 static int new_lua( lua_State *L )
 {
     size_t len = 0;
     const char *mem = (const char*)luaL_checklstring( L, 1, &len );
-    int ref = lstate_ref( L );
     
-    return alloc_lua( L, ref, (void*)mem, len );
+    lua_settop( L, 1 );
+    return alloc_lua( L, lstate_ref( L ), (void*)mem, len );
 }
 
 
 LUALIB_API int luaopen_parcel_unpack( lua_State *L )
 {
-    struct luaL_Reg mmethod[] = {
-        { "__call", unpack_lua },
-        { NULL, NULL }
-    };
     struct luaL_Reg method[] = {
         { "new", new_lua },
+        { "unpack", unpack_lua },
         { NULL, NULL }
     };
     // oo interface
-    struct luaL_Reg oomethod[] = {
+    struct luaL_Reg mmethod[] = {
         { "__gc", gc_lua },
         { "__tostring", tostring_lua },
         { "__call", call_lua },
-        { "__index", index_lua },
         { NULL, NULL }
     };
     
     // create metatable
-    parcel_define_mt( L, MODULE_MT, mmethod, method );
-    parcel_define_mt( L, MODULE_OO_MT, oomethod, NULL );
+    parcel_define_mt( L, MODULE_MT, mmethod, NULL );
     // create module table
-    lua_newtable( L );
-    luaL_getmetatable( L, MODULE_MT );
-    lua_setmetatable( L, -2 );
+    parcel_define_method( L, method );
     
     return 1;
 }
