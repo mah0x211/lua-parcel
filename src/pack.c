@@ -30,12 +30,7 @@
 
 #define MODULE_MT   "parcel.pack"
 
-enum {
-    PACK_TBL_INVAL = -1,
-    PACK_TBL_EMPTY = 0,
-    PACK_TBL_NITEM,
-    PACK_TBL_NKEYS
-};
+
 
 
 static int pack_val( par_pack_t *p, lua_State *L, int idx );
@@ -131,65 +126,6 @@ static int pack_array( par_pack_t *p, lua_State *L, size_t len )
 }
 
 
-// count
-static int get_tbllen( lua_State *L, size_t *len )
-{
-    size_t nelts = 0;
-    
-    // push space
-    lua_pushnil( L );
-    // empty
-    if( !lua_next( L, -2 ) ){
-        return PACK_TBL_EMPTY;
-    }
-    
-    // count number of array index
-    do
-    {
-        // invalid array index value
-        if( lua_type( L, -2 ) != LUA_TNUMBER || 
-            !LUANUM_ISUINT( lua_tonumber( L, -2 ) ) ){
-            goto CHECK_KEYTYPE;
-        }
-        nelts++;
-        lua_pop( L, 1 );
-    } while( lua_next( L, -2 ) );
-    
-    *len = nelts;
-    
-    return PACK_TBL_NITEM;
-
-
-    // count number of map keys
-    while( lua_next( L, -2 ) )
-    {
-CHECK_KEYTYPE:
-        // check key type
-        switch( lua_type( L, -2 ) ){
-            case LUA_TNUMBER:
-                // unsupported key type
-                if( LUANUM_ISDBL( lua_tonumber( L, -2 ) ) ){
-                    goto INVALID_KEY;
-                }
-            case LUA_TSTRING:
-                lua_pop( L, 1 );
-                nelts++;
-            break;
-            
-            // unsupported key type
-            default:
-INVALID_KEY:
-                lua_pop( L, 2 );
-                return PACK_TBL_INVAL;
-        }
-    }
-    
-    *len = nelts;
-    
-    return PACK_TBL_NKEYS;
-}
-
-
 static int pack_val( par_pack_t *p, lua_State *L, int idx )
 {
     const char *str = NULL;
@@ -208,14 +144,14 @@ static int pack_val( par_pack_t *p, lua_State *L, int idx )
             return pack_number( p, L, idx );
         
         case LUA_TTABLE:
-            switch( get_tbllen( L, &len ) ){
-                case PACK_TBL_EMPTY:
+            switch( lparcel_tblnelts( L, &len, 0 ) ){
+                case LP_TBL_NELTS_EMPTY:
                     return par_pack_map( p, 0 );
                 
-                case PACK_TBL_NITEM:
+                case LP_TBL_NELTS_ARRAY:
                     return pack_array( p, L, len );
                 
-                case PACK_TBL_NKEYS:
+                case LP_TBL_NELTS_MAP:
                     return pack_map( p, L, len );
                 
                 // unsupported key type

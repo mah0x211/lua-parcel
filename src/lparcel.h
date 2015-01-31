@@ -116,5 +116,77 @@ static inline int lparcel_define_mt( lua_State *L, const char *tname,
 }
 
 
+// check length of table as array
+enum {
+    LP_TBL_NELTS_INVAL = -1,
+    LP_TBL_NELTS_EMPTY = 0,
+    LP_TBL_NELTS_ARRAY,
+    LP_TBL_NELTS_MAP,
+    LP_TBL_NELTS_NONE
+};
+
+
+static inline int lparcel_tblnelts( lua_State *L, size_t *len, int nomap )
+{
+    size_t nelts = 0;
+    
+    // push space
+    lua_pushnil( L );
+    // empty
+    if( !lua_next( L, -2 ) ){
+        return LP_TBL_NELTS_EMPTY;
+    }
+    
+    // count number of array index
+    do
+    {
+        // invalid array index value
+        if( lua_type( L, -2 ) != LUA_TNUMBER || 
+            !LUANUM_ISUINT( lua_tonumber( L, -2 ) ) )
+        {
+            // do not need number of keys
+            if( nomap ){
+                return LP_TBL_NELTS_NONE;
+            }
+            goto CHECK_KEYTYPE;
+        }
+        nelts++;
+        lua_pop( L, 1 );
+    } while( lua_next( L, -2 ) );
+    
+    *len = nelts;
+    
+    return LP_TBL_NELTS_ARRAY;
+
+
+    // count number of map keys
+    while( lua_next( L, -2 ) )
+    {
+CHECK_KEYTYPE:
+        // check key type
+        switch( lua_type( L, -2 ) ){
+            case LUA_TNUMBER:
+                // unsupported key type
+                if( LUANUM_ISDBL( lua_tonumber( L, -2 ) ) ){
+                    goto INVALID_KEY;
+                }
+            case LUA_TSTRING:
+                lua_pop( L, 1 );
+                nelts++;
+            break;
+            
+            // unsupported key type
+            default:
+INVALID_KEY:
+                lua_pop( L, 2 );
+                return LP_TBL_NELTS_INVAL;
+        }
+    }
+    
+    *len = nelts;
+    
+    return LP_TBL_NELTS_MAP;
+}
+
 
 #endif
