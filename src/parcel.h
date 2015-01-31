@@ -520,6 +520,20 @@ static inline int par_spack_init( par_spack_t *p, size_t blksize,
 }while(0)
 
 
+static inline int par_pack_reset( par_pack_t *p )
+{
+    par_pack_dispose( p );
+    if( ( p->mem = malloc( p->blksize ) ) ){
+        p->cur = 0;
+        p->nblk = 1;
+        p->bytes = p->blksize;
+        return PARCEL_OK;
+    }
+    
+    return -1;
+}
+
+
 static void *_par_pack_increase( par_pack_t *p, size_t bytes )
 {
     size_t remain = p->bytes - p->cur;
