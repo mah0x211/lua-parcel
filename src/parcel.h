@@ -437,7 +437,7 @@ static inline uint8_t par_get_endian( void )
 static inline size_t _par_align_blksize( size_t blksize )
 {
     if( !blksize ){
-        return PAR_BLKSIZE_ALIGNMENT;
+        return PAR_DEFAULT_BLKSIZE;
     }
     else if( blksize < PAR_BLKSIZE_ALIGNMENT ){
         return PAR_BLKSIZE_ALIGNMENT;
@@ -450,7 +450,7 @@ static inline size_t _par_align_blksize( size_t blksize )
 #undef PAR_BLKSIZE_ALIGNMENT
 
 
-// MARK: packing
+// MARK: data structures and management API
 
 typedef struct {
     uint8_t endian;
