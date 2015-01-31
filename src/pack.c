@@ -28,8 +28,7 @@
 
 #include "lparcel.h"
 
-#define MODULE_MT       "parcel.pack_tbl"
-#define MODULE_OO_MT    "parcel.pack"
+#define MODULE_MT   "parcel.pack"
 
 #define LUANUM_ISDBL(val)   ((lua_Number)((lua_Integer)val) != val)
 
@@ -43,11 +42,6 @@ enum {
     PACK_TBL_NKEYS
 };
 
-
-typedef struct {
-    lua_State *L;
-    par_pack_t p;
-} lpack_t;
 
 
 static int pack_val( par_pack_t *p, lua_State *L, int idx );
@@ -250,19 +244,12 @@ static int pack_val( par_pack_t *p, lua_State *L, int idx )
 
 static int pack_lua( lua_State *L )
 {
-    // memory block size
-    lua_Integer blksize = luaL_optinteger( L, 3, 0 );
     par_pack_t p;
     
-    // check blksize
-    if( blksize < 0 ){
-        blksize = 0;
-    }
-    
-    if( par_pack_init( &p, (size_t)blksize ) == 0 )
+    if( par_pack_init( &p, 0 ) == 0 )
     {
-        lua_settop( L, 2 );
-        if( pack_val( &p, L, 2 ) == 0 ){
+        lua_settop( L, 1 );
+        if( pack_val( &p, L, 1 ) == 0 ){
             lua_settop( L, 0 );
             lua_pushlstring( L, p.mem, p.cur );
             par_pack_dispose( &p );
@@ -282,16 +269,16 @@ static int pack_lua( lua_State *L )
 
 static int call_lua( lua_State *L )
 {
-    lpack_t *l = luaL_checkudata( L, 1, MODULE_OO_MT );
+    par_pack_t *p = luaL_checkudata( L, 1, MODULE_MT );
     // pack value
-    int rc = pack_val( &l->p, L, 2 );
+    int rc = pack_val( p, L, 2 );
     
     if( rc == 0 )
     {
         lua_settop( L, 0 );
-        lua_pushlstring( L, l->p.mem, l->p.cur );
+        lua_pushlstring( L, p->mem, p->cur );
         // reset pack
-        if( par_pack_reset( &l->p ) == 0 ){
+        if( par_pack_reset( p ) == 0 ){
             return 1;
         }
     }
@@ -306,15 +293,15 @@ static int call_lua( lua_State *L )
 
 static int tostring_lua( lua_State *L )
 {
-    return lparcel_tostring( L, MODULE_OO_MT );
+    return lparcel_tostring( L, MODULE_MT );
 }
 
 
 static int gc_lua( lua_State *L )
 {
-    lpack_t *l = lua_touserdata( L, 1 );
+    par_pack_t *p = lua_touserdata( L, 1 );
     
-    par_pack_dispose( &l->p );
+    par_pack_dispose( p );
     
     return 0;
 }
@@ -324,7 +311,7 @@ static int alloc_lua( lua_State *L )
 {
     // memory block size
     lua_Integer blksize = luaL_optinteger( L, 1, 0 );
-    lpack_t *l = lua_newuserdata( L, sizeof( lpack_t ) );
+    par_pack_t *p = lua_newuserdata( L, sizeof( par_pack_t ) );
     
     // check blksize
     if( blksize < 0 ){
@@ -332,9 +319,9 @@ static int alloc_lua( lua_State *L )
     }
     
     // alloc
-    if( l && par_pack_init( &l->p, (size_t)blksize ) == 0 ){
+    if( p && par_pack_init( p, (size_t)blksize ) == 0 ){
         // retain references
-        luaL_getmetatable( L, MODULE_OO_MT );
+        luaL_getmetatable( L, MODULE_MT );
         lua_setmetatable( L, -2 );
         return 1;
     }
@@ -349,16 +336,13 @@ static int alloc_lua( lua_State *L )
 
 LUALIB_API int luaopen_parcel_pack( lua_State *L )
 {
-    struct luaL_Reg mmethod[] = {
-        { "__call", pack_lua },
-        { NULL, NULL }
-    };
-    struct luaL_Reg method[] = {
+    struct luaL_Reg funcs[] = {
         { "new", alloc_lua },
+        { "pack", pack_lua },
         { NULL, NULL }
     };
     // oo interface
-    struct luaL_Reg oomethod[] = {
+    struct luaL_Reg mmethod[] = {
         { "__gc", gc_lua },
         { "__tostring", tostring_lua },
         { "__call", call_lua },
@@ -366,12 +350,9 @@ LUALIB_API int luaopen_parcel_pack( lua_State *L )
     };
     
     // create metatable
-    parcel_define_mt( L, MODULE_MT, mmethod, method );
-    parcel_define_mt( L, MODULE_OO_MT, oomethod, NULL );
+    parcel_define_mt( L, MODULE_MT, mmethod, NULL );
     // create module table
-    lua_newtable( L );
-    luaL_getmetatable( L, MODULE_MT );
-    lua_setmetatable( L, -2 );
+    parcel_define_method( L, funcs );
     
     return 1;
 }
