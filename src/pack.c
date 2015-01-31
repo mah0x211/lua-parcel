@@ -30,18 +30,12 @@
 
 #define MODULE_MT   "parcel.pack"
 
-#define LUANUM_ISDBL(val)   ((lua_Number)((lua_Integer)val) != val)
-
-#define LUANUM_ISUINT(val)  (!signbit( val ) && !LUANUM_ISDBL( val ))
-
-
 enum {
     PACK_TBL_INVAL = -1,
     PACK_TBL_EMPTY = 0,
     PACK_TBL_NITEM,
     PACK_TBL_NKEYS
 };
-
 
 
 static int pack_val( par_pack_t *p, lua_State *L, int idx );

@@ -51,6 +51,11 @@
     luaL_unref( L, LUA_REGISTRYINDEX, ref )
 
 
+#define LUANUM_ISDBL(val)   ((lua_Number)((lua_Integer)val) != val)
+
+#define LUANUM_ISUINT(val)  (!signbit( val ) && !LUANUM_ISDBL( val ))
+
+
 // prototypes
 LUALIB_API int luaopen_parcel_pack( lua_State *L );
 LUALIB_API int luaopen_parcel_unpack( lua_State *L );
