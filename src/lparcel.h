@@ -126,7 +126,7 @@ enum {
 };
 
 
-static inline int lparcel_tblnelts( lua_State *L, size_t *len, int nomap )
+static inline int lparcel_tblnelts( lua_State *L, size_t *len, int nokeys )
 {
     size_t nelts = 0;
     
@@ -145,7 +145,8 @@ static inline int lparcel_tblnelts( lua_State *L, size_t *len, int nomap )
             !LUANUM_ISUINT( lua_tonumber( L, -2 ) ) )
         {
             // do not need number of keys
-            if( nomap ){
+            if( nokeys ){
+                lua_pop( L, 2 );
                 return LP_TBL_NELTS_NONE;
             }
             goto CHECK_KEYTYPE;
