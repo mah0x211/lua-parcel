@@ -35,6 +35,7 @@
 
 #define LUANUM_ISUINT(val)  (!signbit( val ) && !LUANUM_ISDBL( val ))
 
+
 enum {
     PACK_TBL_INVAL = -1,
     PACK_TBL_EMPTY = 0,
@@ -285,12 +286,14 @@ static int call_lua( lua_State *L )
     // pack value
     int rc = pack_val( &l->p, L, 2 );
     
-    if( rc == 0 ){
+    if( rc == 0 )
+    {
         lua_settop( L, 0 );
         lua_pushlstring( L, l->p.mem, l->p.cur );
-        // reset cursor
-        l->p.cur = 0;
-        return 1;
+        // reset pack
+        if( par_pack_reset( &l->p ) == 0 ){
+            return 1;
+        }
     }
     
     // got error
