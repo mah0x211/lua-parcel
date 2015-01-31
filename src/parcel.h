@@ -310,7 +310,7 @@ enum {
     // ----+----------------+----------------+----------------+-----+
     // ... | PAR_ISA_IDX(1) | serialized idx | serialized val | ... 
     // ----+----------------+----------------+----------------+-----+
-    // NOTE: the serialized-idx value(M) must be type of unsigned integer.
+    // NOTE: the serialized-idx value must be type of unsigned integer.
     //
     PAR_ISA_IDX,    // non-consecutive array index
     
@@ -1476,10 +1476,13 @@ static inline int par_unpack_key( par_unpack_t *p, par_extract_t *ext,
     {
         // check value type
         switch( ext->isa ){
-            case PAR_ISA_S6:
-            case PAR_ISA_U8 ... PAR_ISA_S64:
             case PAR_ISA_STR5:
             case PAR_ISA_STR8 ... PAR_ISA_STR64:
+            case PAR_ISA_S6:
+            case PAR_ISA_U8 ... PAR_ISA_S64:
+            case PAR_ISA_F16 ... PAR_ISA_F64:
+            case PAR_ISA_TRUE:
+            case PAR_ISA_FALSE:
                 return PARCEL_OK;
             
             case PAR_ISA_EOS:
