@@ -19,6 +19,7 @@ build = {
             sources = { 
                 "src/pack.c",
                 "src/unpack.c",
+                "src/stream_pack.c",
             }
         }
     }
