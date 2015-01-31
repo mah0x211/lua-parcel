@@ -1,26 +1,41 @@
 #!/bin/bash
 
-CYCLE=100
 LUA=luajit
+BENCH_ARGS="$*"
 
-echo "bench #${CYCLE}"
-echo "--------------------------------------------------------------------"
-echo "cmsgpack: pack"
-time $LUA ./bench_msgpack_pack.lua $CYCLE
-echo "--------------------------------------------------------------------"
-echo "cmsgpack: unpack"
-time $LUA ./bench_msgpack_unpack.lua $CYCLE
-echo "--------------------------------------------------------------------"
+echo "PREPROCESS"
+$LUA ./preprocess.lua $BENCH_ARGS
+echo "====================================================================\n"
 
-echo "parcel reduce pack"
-time $LUA ./bench_parcel_packreduce.lua $CYCLE
-echo "--------------------------------------------------------------------"
-echo "parcel reduce unpack"
-time $LUA ./bench_parcel_unpackreduce.lua $CYCLE
-echo "--------------------------------------------------------------------"
+echo "PACK"
+echo "====================================================================\n"
 
-echo "parcel pack"
-time $LUA ./bench_parcel_pack.lua $CYCLE
-echo "parcel unpack"
-time $LUA ./bench_parcel_unpack.lua $CYCLE
+echo "PARCEL pack"
 echo "--------------------------------------------------------------------"
+$LUA ./bench_parcel_pack.lua $BENCH_ARGS
+echo "*********************************************************************\n"
+
+echo "PARCEL STREAM pack"
+echo "--------------------------------------------------------------------"
+$LUA ./bench_parcel_packreduce.lua $BENCH_ARGS
+echo "*********************************************************************\n"
+
+echo "CMSGPACK pack"
+echo "--------------------------------------------------------------------"
+$LUA ./bench_msgpack_pack.lua $BENCH_ARGS
+echo "====================================================================\n\n"
+
+echo "UNPACK"
+echo "====================================================================\n"
+
+echo "PARCEL unpack"
+$LUA ./bench_parcel_unpack.lua $BENCH_ARGS
+echo "*********************************************************************\n"
+
+echo "PARCEL STREAM unpack"
+$LUA ./bench_parcel_unpackreduce.lua $BENCH_ARGS
+echo "*********************************************************************\n"
+
+echo "CMSGPACK unpack"
+$LUA ./bench_msgpack_unpack.lua $BENCH_ARGS
+echo "*********************************************************************\n"

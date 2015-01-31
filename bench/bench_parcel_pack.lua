@@ -1,24 +1,42 @@
-local DATA;
+local pack = require('parcel.pack').pack;
+local sleep = require('process').sleep;
+local clock = require('process').gettimeofday;
+local MB = 1024 * 1024;
+local cycle = _G.arg[2] or 1;
+local DATA = _G.arg[1];
+local sec, res;
+
+local function printSize( fmt, byte )
+    print( fmt:format( byte, byte / MB ) );
+end
+
+print( 'CYCLE:', cycle );
+print( 'TEST FILE: ' .. DATA );
 do
-    local fn = assert( io.open('./allthethings.json') );
+    local fn = assert( io.open( DATA ) );
     DATA = fn:read('*a');
     fn:close();
-    print( 'DATA LENGTH: ' .. #DATA );
+    printSize( 'DATA SIZE: %d B | %f MB', #DATA );
     DATA = require('cjson.safe').decode( DATA );
 end
-
-local sleep = require('process').sleep;
-local pack = require('parcel').pack;
-local clock = os.clock;
-local cycle = _G.arg[1] or 1;
-local sec, json;
-
-print( 'cycle:', cycle );
+print( '==============================' );
+print( 'collectgarbage and sleep 1 sec' );
+print( '==============================' );
 collectgarbage('collect');
 sleep(1);
+
 sec = clock();
 for i = 1, cycle do
-    json = pack( DATA );
+    res = pack( DATA );
 end
 sec = clock() - sec;
-print( sec );
+printSize( 'PACKED SIZE: %d B | %f MB', #res );
+print( ('COST: %f sec'):format( sec ) );
+
+--[[
+collectgarbage('collect');
+print( require('util.table').equal(
+    DATA, 
+    require('parcel').unpack( res )
+));
+--]]
