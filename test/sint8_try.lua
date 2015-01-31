@@ -1,5 +1,5 @@
-local pack = require('parcel.pack');
-local unpack = require('parcel.unpack');
+local pack = require('parcel.pack').pack;
+local unpack = require('parcel.unpack').unpack;
 local bin;
 
 -- 8 bit signed integer
