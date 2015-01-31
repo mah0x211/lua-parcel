@@ -12,30 +12,30 @@ echo "====================================================================\n"
 
 echo "PARCEL pack"
 echo "--------------------------------------------------------------------"
-$LUA ./bench_parcel_pack.lua $BENCH_ARGS
+$LUA ./pack_parcel.lua $BENCH_ARGS
 echo "*********************************************************************\n"
 
 echo "PARCEL STREAM pack"
 echo "--------------------------------------------------------------------"
-$LUA ./bench_parcel_packreduce.lua $BENCH_ARGS
+$LUA ./pack_sparcel.lua $BENCH_ARGS
 echo "*********************************************************************\n"
 
 echo "CMSGPACK pack"
 echo "--------------------------------------------------------------------"
-$LUA ./bench_msgpack_pack.lua $BENCH_ARGS
+$LUA ./pack_msgpack.lua $BENCH_ARGS
 echo "====================================================================\n\n"
 
 echo "UNPACK"
 echo "====================================================================\n"
 
 echo "PARCEL unpack"
-$LUA ./bench_parcel_unpack.lua $BENCH_ARGS
+$LUA ./unpack_parcel.lua $BENCH_ARGS
 echo "*********************************************************************\n"
 
 echo "PARCEL STREAM unpack"
-$LUA ./bench_parcel_unpackreduce.lua $BENCH_ARGS
+$LUA ./unpack_sparcel.lua $BENCH_ARGS
 echo "*********************************************************************\n"
 
 echo "CMSGPACK unpack"
-$LUA ./bench_msgpack_unpack.lua $BENCH_ARGS
+$LUA ./unpack_msgpack.lua $BENCH_ARGS
 echo "*********************************************************************\n"
