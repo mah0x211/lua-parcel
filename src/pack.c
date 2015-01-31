@@ -344,9 +344,9 @@ LUALIB_API int luaopen_parcel_pack( lua_State *L )
     };
     
     // create metatable
-    parcel_define_mt( L, MODULE_MT, mmethod, NULL );
+    lparcel_define_mt( L, MODULE_MT, mmethod, NULL );
     // create module table
-    parcel_define_method( L, funcs );
+    lparcel_define_method( L, funcs );
     
     return 1;
 }

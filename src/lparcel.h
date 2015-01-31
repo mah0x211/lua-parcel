@@ -70,7 +70,8 @@ LUALIB_API int luaopen_parcel_unpack( lua_State *L );
 
 // metanames
 // module definition register
-static inline int parcel_define_method( lua_State *L, struct luaL_Reg method[] )
+static inline int lparcel_define_method( lua_State *L, 
+                                         struct luaL_Reg method[] )
 {
     struct luaL_Reg *ptr = method;
     
@@ -85,9 +86,9 @@ static inline int parcel_define_method( lua_State *L, struct luaL_Reg method[] )
 }
 
 
-static inline int parcel_define_mt( lua_State *L, const char *tname, 
-                                    struct luaL_Reg mmethod[], 
-                                    struct luaL_Reg method[] )
+static inline int lparcel_define_mt( lua_State *L, const char *tname, 
+                                     struct luaL_Reg mmethod[], 
+                                     struct luaL_Reg method[] )
 {
     // create table __metatable
     if( luaL_newmetatable( L, tname ) )
@@ -103,7 +104,7 @@ static inline int parcel_define_mt( lua_State *L, const char *tname,
         // methods
         if( method ){
             lua_pushstring( L, "__index" );
-            parcel_define_method( L, method );
+            lparcel_define_method( L, method );
             lua_rawset( L, -3 );
         }
         lua_pop( L, 1 );
@@ -113,6 +114,7 @@ static inline int parcel_define_mt( lua_State *L, const char *tname,
     
     return 0;
 }
+
 
 
 #endif

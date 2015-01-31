@@ -388,7 +388,7 @@ static int new_lua( lua_State *L )
 
 LUALIB_API int luaopen_parcel_unpack( lua_State *L )
 {
-    struct luaL_Reg method[] = {
+    struct luaL_Reg funcs[] = {
         { "new", new_lua },
         { "unpack", unpack_lua },
         { NULL, NULL }
@@ -402,9 +402,9 @@ LUALIB_API int luaopen_parcel_unpack( lua_State *L )
     };
     
     // create metatable
-    parcel_define_mt( L, MODULE_MT, mmethod, NULL );
+    lparcel_define_mt( L, MODULE_MT, mmethod, NULL );
     // create module table
-    parcel_define_method( L, method );
+    lparcel_define_method( L, funcs );
     
     return 1;
 }
