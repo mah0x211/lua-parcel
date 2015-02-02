@@ -169,6 +169,53 @@ UNPACK_SMAP:
 }
 
 
+static int unpack_set( lua_State *L, par_unpack_t *p, par_extract_t *ext )
+{
+    int rc = 0;
+    size_t len = ext->size.len;
+    size_t i = 0;
+    
+    // create table for set
+    lua_createtable( L, (int)len, 0 );
+    // unpack set items
+    for(; i < len && rc == 0; i++ )
+    {
+        if( ( rc = par_unpack_elm( p, ext, 0 ) ) == 0 ){
+            rc = ext2lua( L, p, ext );
+        }
+    }
+    
+    return rc;
+}
+
+
+static int unpack_sset( lua_State *L, par_unpack_t *p, par_extract_t *ext )
+{
+    int rc = 0;
+    
+    // create table for set
+    lua_createtable( L, 0, 0 );
+    
+UNPACK_SSET:
+    // unpack element
+    if( ( rc = par_unpack_elm( p, ext, 1 ) ) == 0 )
+    {
+        rc = ext2lua( L, p, ext );
+        switch( rc ){
+            case 0:
+                goto UNPACK_SSET;
+            
+            // end-of-stream
+            case PAR_ISA_EOS:
+                return 0;
+        }
+    }
+    
+    // got error
+    return rc;
+}
+
+
 static int ext2lua( lua_State *L, par_unpack_t *p, par_extract_t *ext )
 {
     switch( ext->isa )
@@ -264,12 +311,19 @@ static int ext2lua( lua_State *L, par_unpack_t *p, par_extract_t *ext )
         case PAR_ISA_MAP8 ... PAR_ISA_MAP64:
             return unpack_map( L, p, ext );
         
-        // stream array/map
+        // set
+        case PAR_ISA_SET8 ... PAR_ISA_SET64:
+            return unpack_set( L, p, ext );
+        
+        // stream array/map/set
         case PAR_ISA_SARR:
             return unpack_sarray( L, p, ext );
         
         case PAR_ISA_SMAP:
             return unpack_smap( L, p, ext );
+        
+        case PAR_ISA_SSET:
+            return unpack_sset( L, p, ext );
         
         // array index
         case PAR_ISA_IDX:

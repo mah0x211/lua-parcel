@@ -1347,6 +1347,7 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
             case PAR_ISA_NAN:
             case PAR_ISA_SARR:
             case PAR_ISA_SMAP:
+            case PAR_ISA_SSET:
             case PAR_ISA_IDX:
             case PAR_ISA_EOS:
                 p->cur += PAR_TYPE_SIZE;
@@ -1358,9 +1359,10 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
                 _PAR_UNPACK_NBIT_INT( p, type, ext, 8 );
             break;
             
-            case PAR_ISA_REF8:
             case PAR_ISA_ARR8:
             case PAR_ISA_MAP8:
+            case PAR_ISA_REF8:
+            case PAR_ISA_SET8:
                 _PAR_UNPACK_NBIT_LEN( p, type, ext, 8 );
             break;
             
@@ -1375,9 +1377,10 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
                 _PAR_UNPACK_NBIT_INT( p, type, ext, 16 );
             break;
             
-            case PAR_ISA_REF16:
             case PAR_ISA_ARR16:
             case PAR_ISA_MAP16:
+            case PAR_ISA_REF16:
+            case PAR_ISA_SET16:
                 _PAR_UNPACK_NBIT_LEN( p, type, ext, 16 );
             break;
             
@@ -1396,9 +1399,10 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
                 _PAR_UNPACK_NBIT_FLT( p, type, ext, 32 );
             break;
             
-            case PAR_ISA_REF32:
             case PAR_ISA_ARR32:
             case PAR_ISA_MAP32:
+            case PAR_ISA_REF32:
+            case PAR_ISA_SET32:
                 _PAR_UNPACK_NBIT_LEN( p, type, ext, 32 );
             break;
 
@@ -1417,9 +1421,10 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
                 _PAR_UNPACK_NBIT_FLT( p, type, ext, 64 );
             break;
             
-            case PAR_ISA_REF64:
             case PAR_ISA_ARR64:
             case PAR_ISA_MAP64:
+            case PAR_ISA_REF64:
+            case PAR_ISA_SET64:
                 _PAR_UNPACK_NBIT_LEN( p, type, ext, 64 );
             break;
             
@@ -1509,6 +1514,34 @@ static inline int par_unpack_key( par_unpack_t *p, par_extract_t *ext,
         // illegal byte sequence
         errno = PARCEL_EILSEQ;
         return -1;
+    }
+    
+    return rc;
+}
+
+
+// unpack an element of set
+static inline int par_unpack_elm( par_unpack_t *p, par_extract_t *ext, 
+                                  int allow_eos )
+{
+    int rc = par_unpack( p, ext );
+    
+    if( rc == 0 )
+    {
+        // check value type
+        switch( ext->isa ){
+            case PAR_ISA_EOS:
+                if( allow_eos ){
+                    return PAR_ISA_EOS;
+                }
+            case PAR_ISA_IDX:
+            case PAR_ISA_REF8 ... PAR_ISA_REF64:
+                // illegal byte sequence
+                errno = PARCEL_EILSEQ;
+                return -1;
+        }
+        
+        return PARCEL_OK;
     }
     
     return rc;

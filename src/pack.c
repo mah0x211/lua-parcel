@@ -31,8 +31,6 @@
 #define MODULE_MT   "parcel.pack"
 
 
-
-
 static int pack_val( par_pack_t *p, lua_State *L, int idx );
 
 
@@ -68,7 +66,7 @@ static int pack_number( par_pack_t *p, lua_State *L, int idx )
 
 static int pack_map( par_pack_t *p, lua_State *L, size_t len )
 {
-    // append array
+    // append map
     if( par_pack_map( p, len ) == 0 )
     {
         // push space
