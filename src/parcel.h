@@ -1324,13 +1324,14 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
         {
             // small negative integer
             if( ext->isa & PAR_ISA_S6N ){
+                ext->isa = PAR_ISA_S6N;
                 ext->val.i8 = -((int_fast8_t)(ext->isa & ~PAR_ISA_S6N));
             }
             // small positive integer
             else {
+                ext->isa = PAR_ISA_S6;
                 ext->val.i8 = (int_fast8_t)type->isa;
             }
-            ext->isa = PAR_ISA_S6;
             p->cur += PAR_TYPE_SIZE;
             return PARCEL_OK;
         }
@@ -1465,11 +1466,11 @@ static inline int par_unpack_idx( par_unpack_t *p, par_extract_t *ext )
     
     if( rc == 0 )
     {
-        // check value type
+        // index value must be unsigned integer
         switch( ext->isa ){
             case PAR_ISA_S6:
             case PAR_ISA_U8 ... PAR_ISA_U64:
-                return rc;
+                return PARCEL_OK;
         }
         // illegal byte sequence
         errno = PARCEL_EILSEQ;
@@ -1493,6 +1494,7 @@ static inline int par_unpack_key( par_unpack_t *p, par_extract_t *ext,
             case PAR_ISA_STR5:
             case PAR_ISA_STR8 ... PAR_ISA_STR64:
             case PAR_ISA_S6:
+            case PAR_ISA_S6N:
             case PAR_ISA_U8 ... PAR_ISA_S64:
             case PAR_ISA_F16 ... PAR_ISA_F64:
             case PAR_ISA_TRUE:

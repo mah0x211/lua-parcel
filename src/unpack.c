@@ -211,6 +211,7 @@ static int ext2lua( lua_State *L, par_unpack_t *p, par_extract_t *ext )
             lua_pushinteger( L, (lua_Integer)ext->val.i##bit ); \
         }while(0)
         case PAR_ISA_S6:
+        case PAR_ISA_S6N:
         case PAR_ISA_S8:
             lstate_push_extint( L, ext, 8 );
             return 0;
