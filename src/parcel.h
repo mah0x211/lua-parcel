@@ -1508,6 +1508,7 @@ static inline int par_unpack_key( par_unpack_t *p, par_extract_t *ext,
         }
         // illegal byte sequence
         errno = PARCEL_EILSEQ;
+        return -1;
     }
     
     return rc;
