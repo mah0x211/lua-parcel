@@ -311,7 +311,7 @@ static int unpack_lua( lua_State *L )
     par_unpack_init( &p, (void*)mem, len );
     lua_settop( L, 1 );
     // unpack
-    if( unpack_val( L, &p, &ext ) != -1 ){
+    if( unpack_val( L, &p, &ext ) == 0 ){
         return lua_gettop( L ) - 1;
     }
     
