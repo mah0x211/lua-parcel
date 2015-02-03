@@ -1325,7 +1325,7 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
             // small negative integer
             if( ext->isa & PAR_ISA_S6N ){
                 ext->isa = PAR_ISA_S6N;
-                ext->val.i8 = -((int_fast8_t)(ext->isa & ~PAR_ISA_S6N));
+                ext->val.i8 = -((int_fast8_t)(type->isa & ~PAR_ISA_S6N));
             }
             // small positive integer
             else {
