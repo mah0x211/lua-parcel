@@ -174,7 +174,7 @@ static int pack_lua( lua_State *L )
 {
     par_pack_t p;
     
-    if( par_pack_init( &p, 0 ) == 0 )
+    if( par_pack_init( &p, 0, NULL, NULL ) == 0 )
     {
         lua_settop( L, 1 );
         if( pack_val( &p, L, 1 ) == 0 ){
@@ -247,7 +247,7 @@ static int alloc_lua( lua_State *L )
     }
     
     // alloc
-    if( p && par_pack_init( p, (size_t)blksize ) == 0 ){
+    if( p && par_pack_init( p, (size_t)blksize, NULL, NULL ) == 0 ){
         // retain references
         luaL_getmetatable( L, MODULE_MT );
         lua_setmetatable( L, -2 );

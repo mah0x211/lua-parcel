@@ -32,7 +32,7 @@
 
 
 typedef struct {
-    par_spack_t p;
+    par_pack_t p;
     lua_State *L;
     lua_State *co;
     int ref_co;
@@ -47,7 +47,7 @@ static int coreduce( void *mem, size_t bytes, void *udata )
     int rc = 0;
     
     lstate_pushref( fns->co, fns->ref_fn );
-    lua_pushinteger( fns->co, bytes );
+    lua_pushinteger( fns->co, (lua_Integer)bytes );
     //lua_pushlightuserdata( fns->co, mem );
     lua_pushlstring( fns->co, mem, bytes );
     
@@ -77,42 +77,42 @@ static int coreduce( void *mem, size_t bytes, void *udata )
 }
 
 
-static int pack_val( par_spack_t *p, lua_State *L, int idx );
+static int pack_val( par_pack_t *p, lua_State *L, int idx );
 
-static int pack_number( par_spack_t *p, lua_State *L, int idx )
+static int pack_number( par_pack_t *p, lua_State *L, int idx )
 {
     double num = lua_tonumber( L, idx );
     
     // set nan
     if( isnan( num ) ){
-        return par_spack_nan( p );
+        return par_pack_nan( p );
     }
     // set inf
     else if( isinf( num ) ){
-        return par_spack_inf( p, num );
+        return par_pack_inf( p, num );
     }
     // set zero
     else if( !num ){
-        return par_spack_zero( p );
+        return par_pack_zero( p );
     }
     // float
     else if( LUANUM_ISDBL( num ) ){
-        return par_spack_float64( p, num );
+        return par_pack_float64( p, num );
     }
     // signed integer
     else if( signbit( num ) ){
-        return par_spack_int( p, (int_fast64_t)num );
+        return par_pack_int( p, (int_fast64_t)num );
     }
     
     // unsigned integer
-    return par_spack_uint( p, (uint_fast64_t)num );
+    return par_pack_uint( p, (uint_fast64_t)num );
 }
 
 
-static int pack_map( par_spack_t *p, lua_State *L, size_t len )
+static int pack_map( par_pack_t *p, lua_State *L, size_t len )
 {
     // append array
-    if( par_spack_map( p, len ) == 0 )
+    if( par_pack_map( p, len ) == 0 )
     {
         // push space
         lua_pushnil( L );
@@ -134,10 +134,10 @@ static int pack_map( par_spack_t *p, lua_State *L, size_t len )
 }
 
 
-static int pack_array( par_spack_t *p, lua_State *L, size_t len )
+static int pack_array( par_pack_t *p, lua_State *L, size_t len )
 {
     // append array
-    if( par_spack_array( p, len ) == 0 )
+    if( par_pack_array( p, len ) == 0 )
     {
         lua_Integer seq = 1;
         lua_Integer idx = 0;
@@ -150,7 +150,7 @@ static int pack_array( par_spack_t *p, lua_State *L, size_t len )
                 seq++;
             }
             // append index
-            else if( par_spack_idx( p, (uint_fast64_t)lua_tointeger( L, -2 ) ) != 0 ){
+            else if( par_pack_idx( p, (uint_fast64_t)lua_tointeger( L, -2 ) ) != 0 ){
                 lua_pop( L, 2 );
                 return -1;
             }
@@ -169,7 +169,7 @@ static int pack_array( par_spack_t *p, lua_State *L, size_t len )
 }
 
 
-static int pack_val( par_spack_t *p, lua_State *L, int idx )
+static int pack_val( par_pack_t *p, lua_State *L, int idx )
 {
     const char *str = NULL;
     size_t len = 0;
@@ -178,10 +178,10 @@ static int pack_val( par_spack_t *p, lua_State *L, int idx )
     {
         case LUA_TSTRING:
             str = lua_tolstring( L, idx, &len );
-            return par_spack_str( p, (void*)str, len );
+            return par_pack_str( p, (void*)str, len );
         
         case LUA_TBOOLEAN:
-            return par_spack_bool( p, (uint8_t)lua_toboolean( L, idx ) );
+            return par_pack_bool( p, (uint8_t)lua_toboolean( L, idx ) );
         
         case LUA_TNUMBER:
             return pack_number( p, L, idx );
@@ -189,12 +189,13 @@ static int pack_val( par_spack_t *p, lua_State *L, int idx )
         case LUA_TTABLE:
             switch( lparcel_tblnelts( L, &len, 0 ) ){
                 case LP_TBL_NELTS_EMPTY:
-                    return par_spack_map( p, 0 );
+                    return par_pack_map( p, 0 );
                 
                 case LP_TBL_NELTS_ARRAY:
                     return pack_array( p, L, len );
                 
                 case LP_TBL_NELTS_MAP:
+                case LP_TBL_NELTS_NONE:
                     return pack_map( p, L, len );
                 
                 // unsupported key type
@@ -210,7 +211,7 @@ static int pack_val( par_spack_t *p, lua_State *L, int idx )
         //case LUA_TNONE:
         //case LUA_TNIL:
         default:
-            return par_spack_nil( p );
+            return par_pack_nil( p );
     }
 }
 
@@ -263,7 +264,7 @@ static int alloc_fnstream( lua_State *L, size_t blksize, int ref_fn )
     
     // alloc
     if( fns && ( fns->co = lua_newthread( L ) ) && 
-        par_spack_init( &fns->p, blksize, coreduce, (void*)fns ) == 0 ){
+        par_pack_init( &fns->p, blksize, coreduce, (void*)fns ) == 0 ){
         fns->L = L;
         // retain refs
         fns->ref_co = lstate_ref( L );
