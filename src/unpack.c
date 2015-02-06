@@ -32,7 +32,7 @@
 
 typedef struct {
     par_unpack_t p;
-    int ref;
+    int ref_mem;
 } lunpack_t;
 
 
@@ -379,11 +379,11 @@ static int unpack_lua( lua_State *L )
 
 static int call_lua( lua_State *L )
 {
-    lunpack_t *l = luaL_checkudata( L, 1, MODULE_MT );
+    lunpack_t *lu = luaL_checkudata( L, 1, MODULE_MT );
     par_extract_t ext;
 
     // unpack
-    if( unpack_val( L, &l->p, &ext ) != -1 ){
+    if( unpack_val( L, &lu->p, &ext ) != -1 ){
         return lua_gettop( L ) - 1;
     }
     
@@ -403,31 +403,11 @@ static int tostring_lua( lua_State *L )
 
 static int gc_lua( lua_State *L )
 {
-    lunpack_t *l = lua_touserdata( L, 1 );
+    lunpack_t *lu = lua_touserdata( L, 1 );
     
-    lstate_unref( L, l->ref );
+    lstate_unref( L, lu->ref_mem );
     
     return 0;
-}
-
-
-static int alloc_lua( lua_State *L, int ref, void *mem, size_t len )
-{
-    lunpack_t *l = lua_newuserdata( L, sizeof( lunpack_t ) );
-    
-    if( !l ){
-        lstate_unref( L, ref );
-        lua_pushnil( L );
-        lua_pushstring( L, strerror( errno ) );
-        return 2;
-    }
-    // init
-    l->ref = ref;
-    par_unpack_init( &l->p, (void*)mem, len );
-    luaL_getmetatable( L, MODULE_MT );
-    lua_setmetatable( L, -2 );
-    
-    return 1;
 }
 
 
@@ -435,9 +415,24 @@ static int new_lua( lua_State *L )
 {
     size_t len = 0;
     const char *mem = (const char*)luaL_checklstring( L, 1, &len );
+    int ref = 0;
+    lunpack_t *lu = NULL;
     
     lua_settop( L, 1 );
-    return alloc_lua( L, lstate_ref( L ), (void*)mem, len );
+    ref = lstate_ref( L );
+    if( ( lu = lua_newuserdata( L, sizeof( lunpack_t ) ) ) ){
+        lu->ref_mem = ref;
+        par_unpack_init( &lu->p, (void*)mem, len );
+        luaL_getmetatable( L, MODULE_MT );
+        lua_setmetatable( L, -2 );
+        return 1;
+    }
+    
+    lstate_unref( L, ref );
+    lua_pushnil( L );
+    lua_pushstring( L, strerror( errno ) );
+    
+    return 2;
 }
 
 
