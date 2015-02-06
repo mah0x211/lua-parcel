@@ -32,6 +32,16 @@ local function genMsgPack( json )
     fh:close();
 end
 
+
+local function genCJSON( json )
+    local encode = require('cjson.safe').encode;
+    local fh = assert( io.open( PATH .. '.cjson', 'w' ) );
+    local res = encode( json );
+    
+    fh:write( res );
+    fh:close();
+end
+
 local function decodeJSON( json )
     local json = require('cjson.safe').decode( json );
 
@@ -50,6 +60,7 @@ local function generate()
     sec = clock() - sec;
     print( ('decoded: %f sec'):format( sec ) );
     for k, fn in pairs({
+        cjson = genCJSON,
         msgpack = genMsgPack,
         parcel = genParcel,
         parcelStream = genSParcel
