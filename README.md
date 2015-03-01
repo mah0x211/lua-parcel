@@ -72,7 +72,7 @@ local tbl = {
     0/0, 1/0, -1/0,
     true, false
 };
-local bin = assert( pack( val ) );
+local bin = assert( pack( tbl ) );
 local val = assert( unpack( bin ) );
 print( inspect( val ) );
 --[[
