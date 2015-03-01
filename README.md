@@ -7,6 +7,12 @@ this module is currently under development.
 
 ---
 
+## Installation
+
+```sh
+luarocks install parcel --from=http://mah0x211.github.io/rocks/
+```
+
 ## Serialization
 
 ### bin:string, err:string = pack( val )
