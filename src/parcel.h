@@ -1,11 +1,11 @@
 /*
  *  Copyright 2015 Masatoshi Teruya. All rights reserved.
  *
- *  Permission is hereby granted, free of charge, to any person obtaining a 
- *  copy of this software and associated documentation files (the "Software"), 
- *  to deal in the Software without restriction, including without limitation 
- *  the rights to use, copy, modify, merge, publish, distribute, sublicense, 
- *  and/or sell copies of the Software, and to permit persons to whom the 
+ *  Permission is hereby granted, free of charge, to any person obtaining a
+ *  copy of this software and associated documentation files (the "Software"),
+ *  to deal in the Software without restriction, including without limitation
+ *  the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ *  and/or sell copies of the Software, and to permit persons to whom the
  *  Software is furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in
@@ -13,10 +13,10 @@
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL 
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
  *  THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
- *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  *  DEALINGS IN THE SOFTWARE.
  *
  *  parcel.h
@@ -48,13 +48,13 @@ typedef enum {
     PARCEL_ENOBLKS      = ENOBUFS,
     // EILSEQ: illegal byte sequence
     PARCEL_EILSEQ       = EILSEQ,
-    
+
     // packing
     // EDOM: argument out of domain
     PARCEL_EDOM         = EDOM,
     // ENOTSUP: operation not supported
     PARCEL_ENOTSUP      = ENOTSUP,
-    
+
     // unpacking
     // ENODATA: no message available on memory block
     PARCEL_ENODATA = ENODATA
@@ -67,27 +67,27 @@ static inline char *par_strerror( par_error_t err )
         // generic error
         case PARCEL_OK:
             return "no error";
-        
+
         case PARCEL_ENOMEM:
             return "cannot allocate memory";
-        
+
         case PARCEL_ENOBLKS:
             return "no memory block space available";
-        
+
         case PARCEL_EILSEQ:
             return "illegal byte sequence";
-        
+
         // packing error
         case PARCEL_EDOM:
             return "argument out of domain";
-        
+
         case PARCEL_ENOTSUP:
             return "operation not supported";
-        
+
         // unpacking error
         case PARCEL_ENODATA:
             return "no data available on memory block";
-        
+
         default:
             return strerror( errno );
     }
@@ -116,7 +116,7 @@ static inline char *par_strerror( par_error_t err )
 // MARK: parcel data format
 
 enum {
-    // 
+    //
     // 0x00-7F: 6 bit integer
     // -----------+----------+
     // type       |attr
@@ -136,7 +136,7 @@ enum {
     PAR_ISA_S6_TAIL  = 0x3F,
     PAR_ISA_S6N      = 0x40, // negative small integer
     PAR_ISA_S6N_TAIL = 0x7F,
-    
+
     //
     // 0x80-9F: integer, raw, string, reference, array, map
     // --------------------+----+--------+
@@ -204,7 +204,7 @@ enum {
     // 3 bit right shift
     //
     // uint
-    PAR_ISA_U8   = 0x80, 
+    PAR_ISA_U8   = 0x80,
     PAR_ISA_U16,
     PAR_ISA_U32,
     PAR_ISA_U64,
@@ -243,7 +243,7 @@ enum {
     PAR_ISA_SET16,
     PAR_ISA_SET32,
     PAR_ISA_SET64,
-    
+
     //
     // 0xA0
     // ----------------------+
@@ -275,7 +275,7 @@ enum {
     PAR_ISA_F16,
     PAR_ISA_F32,
     PAR_ISA_F64,
-    
+
     //
     // -----------------------+-----+
     // type                   | hex
@@ -296,7 +296,7 @@ enum {
     PAR_ISA_TRUE,   // true
     PAR_ISA_FALSE,  // false
     PAR_ISA_NIL,    // nil
-    
+
     //
     // 0xA9
     // ----------------------+
@@ -308,12 +308,12 @@ enum {
     //
     //     N
     // ----+----------------+----------------+----------------+-----+
-    // ... | PAR_ISA_IDX(1) | serialized idx | serialized val | ... 
+    // ... | PAR_ISA_IDX(1) | serialized idx | serialized val | ...
     // ----+----------------+----------------+----------------+-----+
     // NOTE: the serialized-idx value must be type of unsigned integer.
     //
     PAR_ISA_IDX,    // non-consecutive array index
-    
+
     //
     // -----------------------+-----+
     // type                   | hex
@@ -350,7 +350,7 @@ enum {
     PAR_ISA_SARR,   // stream array
     PAR_ISA_SMAP,   // stream map
     PAR_ISA_SSET,   // stream set
-    
+
     //
     // UNUSED: 0xAE-BF
     // ----------------------+
@@ -367,7 +367,7 @@ enum {
     // ............ 1011 0010
     // ----------------------+
     //
-    
+
     //
     // 0xC0-DF
     // ----------------------+
@@ -382,7 +382,7 @@ enum {
     //
     PAR_ISA_STR5      = 0xC0,
     PAR_ISA_STR5_TAIL = 0xDF,
-    
+
     //
     // 0xE0-EF, 0xF0-FF
     // ----------------------+
@@ -442,7 +442,7 @@ static inline size_t _par_align_blksize( size_t blksize )
     else if( blksize < PAR_BLKSIZE_ALIGNMENT ){
         return PAR_BLKSIZE_ALIGNMENT;
     }
-    
+
     return blksize / PAR_BLKSIZE_ALIGNMENT * PAR_BLKSIZE_ALIGNMENT;
 }
 
@@ -474,18 +474,18 @@ typedef struct _par_pack_t {
 static inline void *_par_pack_increase( par_pack_t *p, size_t bytes )
 {
     size_t remain = p->bytes - p->cur;
-    
+
     if( remain < bytes )
     {
         size_t nblk = 0;
-        
+
         // calculate number of block
         bytes -= remain;
         nblk += ( bytes / p->blksize ) + !!( bytes % p->blksize );
         if( nblk < ( p->nblkmax - p->nblk ) )
         {
             void *mem = NULL;
-            
+
             bytes = p->blksize * ( p->nblk + nblk );
             // failed to allocate memory block
             if( !( mem = realloc( p->mem, bytes ) ) ){
@@ -501,7 +501,7 @@ static inline void *_par_pack_increase( par_pack_t *p, size_t bytes )
             return NULL;
         }
     }
-    
+
     return p->mem;
 }
 
@@ -509,7 +509,7 @@ static inline void *_par_pack_increase( par_pack_t *p, size_t bytes )
 static inline void *_par_pack_reduce( par_pack_t *p, size_t bytes )
 {
     size_t remain = p->blksize - p->cur;
-    
+
     if( remain < bytes )
     {
         // failed to reduce memory
@@ -519,7 +519,7 @@ static inline void *_par_pack_reduce( par_pack_t *p, size_t bytes )
         // rewind cursor
         p->cur = 0;
     }
-    
+
     return p->mem;
 }
 
@@ -542,7 +542,7 @@ static inline int par_pack_init( par_pack_t *p, size_t blksize,
         p->allocf = ( reducer ) ? _par_pack_reduce: _par_pack_increase;
         return PARCEL_OK;
     }
-    
+
     return -1;
 }
 
@@ -564,7 +564,7 @@ static inline int par_pack_reset( par_pack_t *p )
         p->bytes = p->blksize;
         return PARCEL_OK;
     }
-    
+
     return -1;
 }
 
@@ -572,13 +572,13 @@ static inline int par_pack_reset( par_pack_t *p )
 static inline int par_pack_merge( par_pack_t *pdest, par_pack_t *psrc )
 {
     void *mem = _par_pack_increase( pdest, psrc->cur );
-    
+
     if( mem ){
         memcpy( pdest->mem + pdest->cur, psrc->mem, psrc->cur );
         pdest->cur += psrc->cur;
         return PARCEL_OK;
     }
-    
+
     return -1;
 }
 
@@ -595,7 +595,7 @@ static inline int par_pack_merge( par_pack_t *pdest, par_pack_t *psrc )
 })
 
 
-static inline int _par_pack_type_set( par_type_t *pval, uint8_t type, 
+static inline int _par_pack_type_set( par_type_t *pval, uint8_t type,
                                       uint8_t attr, uint8_t domain )
 {
     if( attr & ~domain ){
@@ -603,7 +603,7 @@ static inline int _par_pack_type_set( par_type_t *pval, uint8_t type,
         return -1;
     }
     pval->isa = type | attr;
-    
+
     return PARCEL_OK;
 }
 
@@ -927,7 +927,7 @@ static inline int par_pack_ref( par_pack_t *p, size_t idx )
     if( idx < p->cur )
     {
         par_type_t *pval = (par_type_t*)( p->mem + idx );
-        
+
         // verify type
         switch( pval->isa ){
             case PAR_ISA_REF8 ... PAR_ISA_MAP64:
@@ -938,10 +938,10 @@ static inline int par_pack_ref( par_pack_t *p, size_t idx )
                 return PARCEL_OK;
         }
     }
-    
+
     // illegal byte sequence
     errno = PARCEL_EILSEQ;
-    
+
     return -1;
 }
 
@@ -1000,7 +1000,7 @@ static inline int par_pack_raw( par_pack_t *p, void *val, size_t len )
     else {
         _PAR_PACK_BYTEA( p, PAR_ISA_RAW, val, len );
     }
-    
+
     return PARCEL_OK;
 }
 
@@ -1017,7 +1017,7 @@ static inline int par_pack_str( par_pack_t *p, void *val, size_t len )
             _PAR_PACK_TYPE_WITH_LEN( p, PAR_ISA_STR, len );
         }
         _PAR_SPACK_BYTEA( p, val, len );
-        
+
         return PARCEL_OK;
     }
     // 5 bit length string
@@ -1032,7 +1032,7 @@ static inline int par_pack_str( par_pack_t *p, void *val, size_t len )
     else {
         _PAR_PACK_BYTEA( p, PAR_ISA_STR, val, len );
     }
-    
+
     return PARCEL_OK;
 }
 
@@ -1145,7 +1145,7 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
     if( p->cur < p->blksize )
     {
         par_type_t *type = (par_type_t*)p->mem + p->cur;
-        
+
         // init
         ext->isa = type->isa;
         ext->size.len = 0;
@@ -1188,47 +1188,47 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
             case PAR_ISA_S8:
                 _PAR_UNPACK_NBIT_INT( p, type, ext, 8 );
             break;
-            
+
             case PAR_ISA_ARR8:
             case PAR_ISA_MAP8:
             case PAR_ISA_REF8:
             case PAR_ISA_SET8:
                 _PAR_UNPACK_NBIT_LEN( p, type, ext, 8 );
             break;
-            
+
             case PAR_ISA_RAW8:
             case PAR_ISA_STR8:
                 _PAR_UNPACK_NBIT_BYTEA( p, type, ext, 8 );
             break;
-            
+
             // 16 bit
             case PAR_ISA_U16:
             case PAR_ISA_S16:
                 _PAR_UNPACK_NBIT_INT( p, type, ext, 16 );
             break;
-            
+
             case PAR_ISA_ARR16:
             case PAR_ISA_MAP16:
             case PAR_ISA_REF16:
             case PAR_ISA_SET16:
                 _PAR_UNPACK_NBIT_LEN( p, type, ext, 16 );
             break;
-            
+
             case PAR_ISA_RAW16:
             case PAR_ISA_STR16:
                 _PAR_UNPACK_NBIT_BYTEA( p, type, ext, 16 );
             break;
-            
+
             // 32 bit
             case PAR_ISA_U32:
             case PAR_ISA_S32:
                 _PAR_UNPACK_NBIT_INT( p, type, ext, 32 );
             break;
-            
+
             case PAR_ISA_F32:
                 _PAR_UNPACK_NBIT_FLT( p, type, ext, 32 );
             break;
-            
+
             case PAR_ISA_ARR32:
             case PAR_ISA_MAP32:
             case PAR_ISA_REF32:
@@ -1240,29 +1240,29 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
             case PAR_ISA_STR32:
                 _PAR_UNPACK_NBIT_BYTEA( p, type, ext, 32 );
             break;
-            
+
             // 64 bit
             case PAR_ISA_U64:
             case PAR_ISA_S64:
                 _PAR_UNPACK_NBIT_INT( p, type, ext, 64 );
             break;
-            
+
             case PAR_ISA_F64:
                 _PAR_UNPACK_NBIT_FLT( p, type, ext, 64 );
             break;
-            
+
             case PAR_ISA_ARR64:
             case PAR_ISA_MAP64:
             case PAR_ISA_REF64:
             case PAR_ISA_SET64:
                 _PAR_UNPACK_NBIT_LEN( p, type, ext, 64 );
             break;
-            
+
             case PAR_ISA_RAW64:
             case PAR_ISA_STR64:
                 _PAR_UNPACK_NBIT_BYTEA( p, type, ext, 64 );
             break;
-            
+
             // 5 bit length string
             case PAR_ISA_STR5 ... PAR_ISA_STR5_TAIL:
                 ext->isa &= ~(0x1F);
@@ -1270,7 +1270,7 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
                 ext->val.bytea = p->mem + p->cur + PAR_TYPE_SIZE;
                 p->cur += PAR_TYPE_SIZE + ext->size.len;
             break;
-            
+
             // 4 bit length array/map
             case PAR_ISA_ARR4 ... PAR_ISA_MAP4_TAIL:
                 ext->isa &= ~(0xF);
@@ -1283,10 +1283,10 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
                 errno = PARCEL_EILSEQ;
                 return -1;
         }
-        
+
         return PARCEL_OK;
     }
-    
+
     // end-of-data
     // no message available on memory block
     errno = PARCEL_ENODATA;
@@ -1298,7 +1298,7 @@ static inline int par_unpack( par_unpack_t *p, par_extract_t *ext )
 static inline int par_unpack_idx( par_unpack_t *p, par_extract_t *ext )
 {
     int rc = par_unpack( p, ext );
-    
+
     if( rc == 0 )
     {
         // index value must be unsigned integer
@@ -1311,17 +1311,17 @@ static inline int par_unpack_idx( par_unpack_t *p, par_extract_t *ext )
         errno = PARCEL_EILSEQ;
         return -1;
     }
-    
+
     return rc;
 }
 
 
 // unpack a key value of map
-static inline int par_unpack_key( par_unpack_t *p, par_extract_t *ext, 
+static inline int par_unpack_key( par_unpack_t *p, par_extract_t *ext,
                                   int allow_eos )
 {
     int rc = par_unpack( p, ext );
-    
+
     if( rc == 0 )
     {
         // check value type
@@ -1335,7 +1335,7 @@ static inline int par_unpack_key( par_unpack_t *p, par_extract_t *ext,
             case PAR_ISA_TRUE:
             case PAR_ISA_FALSE:
                 return PARCEL_OK;
-            
+
             case PAR_ISA_EOS:
                 if( allow_eos ){
                     return PAR_ISA_EOS;
@@ -1345,17 +1345,17 @@ static inline int par_unpack_key( par_unpack_t *p, par_extract_t *ext,
         errno = PARCEL_EILSEQ;
         return -1;
     }
-    
+
     return rc;
 }
 
 
 // unpack an element of set
-static inline int par_unpack_elm( par_unpack_t *p, par_extract_t *ext, 
+static inline int par_unpack_elm( par_unpack_t *p, par_extract_t *ext,
                                   int allow_eos )
 {
     int rc = par_unpack( p, ext );
-    
+
     if( rc == 0 )
     {
         // check value type
@@ -1370,10 +1370,10 @@ static inline int par_unpack_elm( par_unpack_t *p, par_extract_t *ext,
                 errno = PARCEL_EILSEQ;
                 return -1;
         }
-        
+
         return PARCEL_OK;
     }
-    
+
     return rc;
 }
 
