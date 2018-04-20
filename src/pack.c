@@ -110,7 +110,7 @@ static int alloc_lua( lua_State *L )
     }
 
     // alloc
-    if( p && par_pack_init( p, (size_t)blksize, NULL, NULL ) == 0 ){
+    if( par_pack_init( p, (size_t)blksize, NULL, NULL ) == 0 ){
         // retain references
         luaL_getmetatable( L, MODULE_MT );
         lua_setmetatable( L, -2 );

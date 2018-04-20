@@ -420,19 +420,13 @@ static int new_lua( lua_State *L )
 
     lua_settop( L, 1 );
     ref = lstate_ref( L );
-    if( ( lu = lua_newuserdata( L, sizeof( lunpack_t ) ) ) ){
-        lu->ref_mem = ref;
-        par_unpack_init( &lu->p, (void*)mem, len );
-        luaL_getmetatable( L, MODULE_MT );
-        lua_setmetatable( L, -2 );
-        return 1;
-    }
-    
-    lstate_unref( L, ref );
-    lua_pushnil( L );
-    lua_pushstring( L, strerror( errno ) );
-    
-    return 2;
+    lu = lua_newuserdata( L, sizeof( lunpack_t ) );
+    lu->ref_mem = ref;
+    par_unpack_init( &lu->p, (void*)mem, len );
+    luaL_getmetatable( L, MODULE_MT );
+    lua_setmetatable( L, -2 );
+
+    return 1;
 }
 
 

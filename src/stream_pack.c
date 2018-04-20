@@ -123,8 +123,8 @@ static int alloc_fnstream( lua_State *L, size_t blksize, int ref_fn )
     lparcel_fnstream_t *fns = lua_newuserdata( L, sizeof( lparcel_fnstream_t ) );
 
     // alloc
-    if( fns && ( fns->co = lua_newthread( L ) ) && 
-        par_pack_init( &fns->p, blksize, coreduce, (void*)fns ) == 0 ){
+    fns->co = lua_newthread( L );
+    if( par_pack_init( &fns->p, blksize, coreduce, (void*)fns ) == 0 ){
         fns->L = L;
         // retain refs
         fns->ref_co = lstate_ref( L );
